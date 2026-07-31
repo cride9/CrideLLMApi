@@ -1,0 +1,81 @@
+## .NET build artifacts
+bin/
+obj/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.vspscc
+*.vssscc
+*.sln.docstates
+
+## Visual Studio Code
+.vscode/
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## MSTest
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+
+## BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+## .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## NuGet Symbol packages
+*.snupkg
+
+## Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+## Folder config
+Desktop.ini
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+## Linux
+*~
+.directory
+
+## Recycle Bin
+$RECYCLE.BIN/
+
+## Windows shortcuts
+*.lnk
