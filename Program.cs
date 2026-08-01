@@ -1,7 +1,6 @@
 ﻿using CrideLLMApi.Api;
 using CrideLLMApi.DTO;
 using CrideLLMApi.Helpers;
-using System.Text.Json;
 
 CrideApi _api = new(new ProviderInfo()
 {
@@ -10,39 +9,34 @@ CrideApi _api = new(new ProviderInfo()
     ReasoningEffort = REASONING_EFFORT.NONE,
     ToolChoice = TOOL_CHOICE.AUTO
 });
+// Creates a new conversation memory for the API. This is useful if you want to start a new conversation without any previous context.
+_api.NewMemory();
 
-ApiFunction function = new()
+await foreach (var item in _api.GetResponseAsync("Hi! My name is Cride :D"))
 {
-    Name = "hello_user",
-    Description = "A simple function that returns a greeting message.",
-    Properties =
-    {
-        ["name"] = new FunctionProperties
-        {
-            Type = "string", 
-            Description = "The name of the person to greet."
-        }
-    },
-    Required = new[] { "name" }
-};
-
-_api.ToolCallExecuted += (tool, result) =>
-{
-    Console.WriteLine($"[tool] {tool.Function?.Name}({tool.Function?.Arguments}) => {result}");
-};
-
-Task<string> HelloUser(string args)
-{
-    var doc = JsonDocument.Parse(args);
-    var name = doc.RootElement.GetProperty("name").GetString();
-    return Task.FromResult($"Hello, {name}!");
+    Console.Write(item.Content);
 }
+Console.WriteLine();
 
-_api.AddFunction(function, HelloUser);
-
-await foreach (var item in _api.GetResponseAsync("Greet Cride"))
+await foreach (var item in _api.GetResponseAsync("What was my name?"))
 {
-    if (item.Role == REQUEST_ROLE.ASSISTANT.ToString().ToLower())
-        Console.Write(item);
+    Console.Write(item.Content);
 }
+Console.WriteLine();
+
+var memoryBefore = _api.GetMemory();
+_api.NewMemory(); // Fresh start
+await foreach (var item in _api.GetResponseAsync("What was my name?"))
+{
+    Console.Write(item.Content);
+}
+Console.WriteLine();
+
+_api.NewMemory(memoryBefore); // Restore previous memory
+await foreach (var item in _api.GetResponseAsync("What was my name?"))
+{
+    Console.Write(item.Content);
+}
+Console.WriteLine();
+
 Console.ReadKey();
