@@ -35,9 +35,13 @@ public class ApiFunction
 public sealed record FunctionProperties
 {
     [JsonPropertyName("type")]
-    public string Type { get; init; }
+    public required string Type { get; init; }
     [JsonPropertyName("description")]
-    public string Description { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+    [JsonPropertyName("enum")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object[ ]? Enum { get; init; }
 }
 
 public sealed record FunctionCallObject
