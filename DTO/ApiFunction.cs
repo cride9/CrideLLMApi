@@ -12,7 +12,7 @@ public class ApiFunction
 
     public FunctionCallObject AsFunctionCall()
     {
-        FunctionCallObject dummy = new FunctionCallObject()
+        FunctionCallObject dummy = new()
         {
             Type = "function",
             Function = new FunctionBody()

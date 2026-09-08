@@ -4,7 +4,8 @@
 public enum API_MODE
 {
     LOCAL = 0,
-    OPENAI_COMPATIBLE = 1
+    OPENAI_COMPATIBLE = 1,
+    COUNT
 }
 
 [Flags]
@@ -13,7 +14,8 @@ public enum REQUEST_ROLE
     SYSTEM,
     USER,
     ASSISTANT,
-    TOOL
+    TOOL,
+    COUNT
 }
 
 [Flags]
@@ -22,12 +24,14 @@ public enum REASONING_EFFORT
     NONE,
     LOW,
     HIGH,
-    MAX
+    MAX,
+    COUNT
 }
 
 [Flags]
 public enum TOOL_CHOICE
 {
     AUTO,
-    REQUIRED
+    REQUIRED,
+    COUNT
 }

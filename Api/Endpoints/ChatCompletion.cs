@@ -9,25 +9,23 @@ namespace CrideLLMApi.Api.Endpoints;
 
 public class ChatCompletion
 {
-    private List<ChatMessage> _chatHistory;
+    public event Action<ToolCall, string>? ToolCallExecuted;
+    private ContextManager? _contextManager;
     private Dictionary<int, ToolCall> _toolCalls = new();
     private List<FunctionCallObject> _apiFunctions = new();
     private string? _lastFinishReason;
     private ProviderInfo _llmInfo;
     private HttpClient _httpClient;
     private readonly Dictionary<string, ToolExecutor> _toolHandlers = new();
-    private readonly Action<ToolCall, string>? _toolCallExecuted;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public ChatCompletion(ProviderInfo lLMInfo, HttpClient httpClient, List<ChatMessage>? chatHistory, Action<ToolCall, string>? toolCallExecuted = null)
+    public ChatCompletion(ProviderInfo lLMInfo, HttpClient httpClient)
     {
         _llmInfo = lLMInfo;
         _httpClient = httpClient;
-        _toolCallExecuted = toolCallExecuted;
-        _chatHistory = chatHistory;
     }
 
     public IEnumerable<FunctionCallObject> GetFunctionCalls() =>
@@ -63,19 +61,29 @@ public class ChatCompletion
 
     public void AddFunction(ApiFunction function, ToolExecutor? handler = null)
     {
-        _apiFunctions.Add(function.AsFunctionCall());
-        if (handler != null)
-        {
-            _toolHandlers[function.Name] = handler;
-        }
+        _apiFunctions.Add(function.AsFunctionCall( ));
+
+        if ( handler != null )
+            _toolHandlers[ function.Name ] = handler;
     }
 
-    public void AddFunctions(IEnumerable<(ApiFunction Function, ToolExecutor? Handler)> functions)
+    public void AddFunction<TArgs>(ApiFunction function, Func<TArgs, Task<string>> handler)
     {
-        foreach (var (function, handler) in functions)
+        _apiFunctions.Add(function.AsFunctionCall( ));
+
+        _toolHandlers[ function.Name ] = async argumentsJson =>
         {
-            AddFunction(function, handler);
-        }
+            var args = JsonSerializer.Deserialize<TArgs>(argumentsJson)
+                ?? throw new JsonException(
+                    $"Failed to deserialize arguments for tool '{function.Name}'.");
+
+            return await handler(args);
+        };
+    }
+
+    public void AddContextManager(ContextManager ctxManager)
+    {
+        _contextManager = ctxManager;
     }
 
     private async IAsyncEnumerable<ChatCompletionChunk> StreamChunksAsync(object requestBody)
@@ -135,9 +143,9 @@ public class ChatCompletion
 
     private async Task ExecuteToolCallsAsync(List<ToolCall> toolCalls)
     {
-        _chatHistory.Add(new ChatMessage
+        _contextManager?.Add(new ChatMessage
         {
-            Role = "assistant",
+            Role = REQUEST_ROLE.ASSISTANT.ToString().ToLower(),
             Content = null,
             ToolCalls = toolCalls
         });
@@ -146,9 +154,9 @@ public class ChatCompletion
         {
             var result = await RunToolAsync(tool);
 
-            _chatHistory.Add(new ChatMessage
+            _contextManager?.Add(new ChatMessage
             {
-                Role = "tool",
+                Role = REQUEST_ROLE.TOOL.ToString().ToLower(),
                 ToolCallId = tool.Id,
                 Content = result
             });
@@ -175,14 +183,14 @@ public class ChatCompletion
                 result = $"Error executing tool '{name}': {ex.Message}";
             }
         }
-        _toolCallExecuted?.Invoke(tool, result);
+        ToolCallExecuted?.Invoke(tool, result);
         return result;
     }
 
     private object BuildRequestBody() => new
     {
         model = _llmInfo.ModelName,
-        messages = _chatHistory,
+        messages = _contextManager?.GetMessages() ?? new List<ChatMessage>(),
         tools = _apiFunctions,
         stream = _llmInfo.Streaming,
         reasoning_effort = _llmInfo.ReasoningEffort.ToString().ToLower(),
@@ -191,7 +199,7 @@ public class ChatCompletion
 
     private object GenerateRequestBody(REQUEST_ROLE requestType, string content)
     {
-        _chatHistory.Add(new ChatMessage { Role = requestType.ToString().ToLower(), Content = content });
+        _contextManager?.Add(new ChatMessage { Role = requestType.ToString().ToLower(), Content = content });
         return BuildRequestBody();
     }
 

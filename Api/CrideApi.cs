@@ -18,9 +18,8 @@ public class CrideApi : IDisposable
     public delegate Task<string> ToolExecutor(string argumentsJson);
     private ProviderInfo _llmInfo;
     private HttpClient _httpClient;
-    public event Action<ToolCall, string>? ToolCallExecuted;
-    private Dictionary<API_ENDPOINT, dynamic> _endpoints; // dynamic bad practice but idc now
-    private List<ChatMessage> _chatHistory;
+    private Dictionary<API_ENDPOINT, dynamic> _endpoints;
+
     public CrideApi(Uri endpoint, string? apiKey = null, string? modelName = null, bool streaming = true) =>
         InitializeEndpoint(new ProviderInfo() { EndPoint = endpoint, ApiKey = apiKey, ModelName = modelName, Streaming = streaming });
     public CrideApi(string endpoint, string? apiKey = null, string? modelName = null, bool streaming = true) =>
@@ -28,40 +27,12 @@ public class CrideApi : IDisposable
     public CrideApi(ProviderInfo lLMInfo) =>
         InitializeEndpoint(lLMInfo);
 
-    public IEnumerable<FunctionCallObject> GetFunctionCalls() =>
-        _endpoints[API_ENDPOINT.CHAT_COMPLETION].GetFunctionCalls();
-    public void AddFunctionCall(ApiFunction function, ToolExecutor? handler = null) =>
-        _endpoints[API_ENDPOINT.CHAT_COMPLETION].AddFunction(function, handler);
-    public void AddFunctionCalls(IEnumerable<(ApiFunction Function, ToolExecutor? Handler)> functions) =>
-        _endpoints[API_ENDPOINT.CHAT_COMPLETION].AddFunctionCalls(functions);
-
-    public List<ChatMessage> NewMemory() =>
-        _chatHistory = new List<ChatMessage>();
-    public List<ChatMessage> NewMemory(List<ChatMessage> memory) =>
-        _chatHistory = memory;
-    public List<ChatMessage>? GetMemory() =>
-        _chatHistory.Select(x => x with { }).ToList();
-
-    public async IAsyncEnumerable<Delta> GetResponseAsync(string message)
+    public T? GetEndpointMethods<T>( )
     {
-        var stream = (IAsyncEnumerable<Delta>)
-            _endpoints[API_ENDPOINT.CHAT_COMPLETION].GetResponseAsync(message);
-
-        await foreach (var delta in stream)
-        {
-            yield return delta;
-        }
+        return (T?) _endpoints.Values
+            .FirstOrDefault(x => x.GetType( ) == typeof(T));
     }
-    public async IAsyncEnumerable<ChatCompletionChunk> GetRawResponseAsync(string message)
-    {
-        var stream = (IAsyncEnumerable<ChatCompletionChunk>)
-            _endpoints[API_ENDPOINT.CHAT_COMPLETION].GetRawResponseAsync(message);
 
-        await foreach (var chunk in stream)
-        {
-            yield return chunk;
-        }
-    }
     private void InitializeEndpoint(ProviderInfo info)
     {
         _llmInfo = info;
@@ -77,7 +48,12 @@ public class CrideApi : IDisposable
         }
         _endpoints = new()
         {
-            { API_ENDPOINT.CHAT_COMPLETION, new ChatCompletion(_llmInfo, _httpClient, _chatHistory ?? new List<ChatMessage>(), (tool, result) => ToolCallExecuted?.Invoke(tool, result)) }
+            { 
+                API_ENDPOINT.CHAT_COMPLETION, 
+                new ChatCompletion(
+                    _llmInfo,
+                    _httpClient)
+            }
         };
     }
     public void Dispose()
