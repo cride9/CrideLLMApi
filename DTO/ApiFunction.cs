@@ -3,6 +3,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace CrideLLMApi.DTO;
 
+/// <summary>
+/// Represents an API function with its name, description, properties, and required parameters.
+/// </summary>
 public class ApiFunction
 {
     public string Name { get; set; }
@@ -10,6 +13,10 @@ public class ApiFunction
     public Dictionary<string, FunctionProperties> Properties { get; set; } = new();
     public string[] Required { get; set; }
 
+    /// <summary>
+    /// Converts the ApiFunction instance into a FunctionCallObject, which is a representation of the function call structure.
+    /// </summary>
+    /// <returns>The function call object.</returns>
     public FunctionCallObject AsFunctionCall()
     {
         FunctionCallObject dummy = new()

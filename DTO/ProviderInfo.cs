@@ -2,6 +2,9 @@
 
 namespace CrideLLMApi.DTO;
 
+/// <summary>
+/// Represents information about a provider, including model name, API key, endpoint, streaming option, API mode, reasoning effort, and tool choice.
+/// </summary>
 public sealed record ProviderInfo
 {
     public string? ModelName;

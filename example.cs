@@ -3,9 +3,13 @@ using CrideLLMApi.Api.Endpoints;
 using CrideLLMApi.DTO;
 using CrideLLMApi.Helpers;
 
+/// <summary>
+/// This is an example of how to use the CrideLLMApi to get the current weather in a given location.
+/// CHANGE PROPERTIES TO CONSOLE APP TO RUN THIS EXAMPLE
+/// </summary>
 class Example
 {
-    public async Task Main(string[ ] args)
+    static async Task Main(string[] args)
     {
         CrideApi _api = new(new ProviderInfo( )
         {
@@ -15,19 +19,40 @@ class Example
             ToolChoice = TOOL_CHOICE.AUTO
         });
 
-        var chatCompletion = _api.GetEndpointMethods<ChatCompletion>( );
-        if ( chatCompletion is null )
-            return;
+        var chatCompletion = _api.GetEndpointMethods<ChatCompletion>( )!;
 
         ContextManager ctxManager = new( );
         chatCompletion.AddContextManager(ctxManager);
 
-        await foreach ( var item in chatCompletion.GetResponseAsync("Hi! My name is Cride :D") )
+        chatCompletion.AddFunction<GetWeatherArgs>(new()
         {
-            Console.Write(item.Content);
+            Name = "get_current_weather",
+            Description = "Get the current weather in a given location",
+            Properties = new()
+            {
+                ["name"] = new() { Type = "string", Description = "The name of the location" },
+                ["unit"] = new() { Type = "string", Description = "The unit of temperature (celsius or fahrenheit)" }
+            },
+            Required = ["name", "unit"]
+        }, GetCurrentWeather);
+
+        await foreach ( var item in chatCompletion.GetRawResponseAsync("Hows the weather in Budapest?") )
+        {
+            Console.Write(item.Choices[0].Delta.Content);
         }
 
         Console.ReadKey( );
     }
+
+    public static async Task<string> GetCurrentWeather(GetWeatherArgs args)
+    {
+        Console.WriteLine($"[TOOL CALL] The current weather in {args.name} is 25 degrees {args.unit}.");
+        return $"The current weather in {args.name} is 25 degrees {args.unit}.";
+    }
 }
 
+class GetWeatherArgs
+{
+    public string name { get; set; }
+    public string unit { get; set; }
+}

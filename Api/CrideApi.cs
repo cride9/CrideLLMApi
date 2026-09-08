@@ -2,20 +2,11 @@
 using CrideLLMApi.DTO;
 using CrideLLMApi.Helpers;
 using System.Net.Http.Headers;
-using System.Reflection;
 
 namespace CrideLLMApi.Api;
 
-public enum API_ENDPOINT
-{
-    CHAT_COMPLETION,
-    EMBEDDING,
-    MODELS
-}
-
 public class CrideApi : IDisposable
 {
-    public delegate Task<string> ToolExecutor(string argumentsJson);
     private ProviderInfo _llmInfo;
     private HttpClient _httpClient;
     private Dictionary<API_ENDPOINT, dynamic> _endpoints;
@@ -27,6 +18,11 @@ public class CrideApi : IDisposable
     public CrideApi(ProviderInfo lLMInfo) =>
         InitializeEndpoint(lLMInfo);
 
+    /// <summary>
+    /// Gets the endpoint methods for the specified type.
+    /// </summary>
+    /// <typeparam name="T">The class of the endpoint methods to retrieve. (eg.: ChatCompletion)</typeparam>
+    /// <returns>Retrieves the endpoint methods for the specified class.</returns>
     public T? GetEndpointMethods<T>( )
     {
         return (T?) _endpoints.Values
@@ -56,6 +52,7 @@ public class CrideApi : IDisposable
             }
         };
     }
+
     public void Dispose()
     {
         _httpClient.Dispose();

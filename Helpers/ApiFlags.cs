@@ -35,3 +35,11 @@ public enum TOOL_CHOICE
     REQUIRED,
     COUNT
 }
+
+[Flags]
+public enum API_ENDPOINT
+{
+    CHAT_COMPLETION,
+    EMBEDDING,
+    MODELS
+}
