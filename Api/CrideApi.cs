@@ -9,7 +9,7 @@ public class CrideApi : IDisposable
 {
     private ProviderInfo _llmInfo;
     private HttpClient _httpClient;
-    private Dictionary<API_ENDPOINT, dynamic> _endpoints;
+    private List<object> _endpoints;
 
     public CrideApi(Uri endpoint, string? apiKey = null, string? modelName = null, bool streaming = true) =>
         InitializeEndpoint(new ProviderInfo() { EndPoint = endpoint, ApiKey = apiKey, ModelName = modelName, Streaming = streaming });
@@ -23,10 +23,11 @@ public class CrideApi : IDisposable
     /// </summary>
     /// <typeparam name="T">The class of the endpoint methods to retrieve. (eg.: ChatCompletion)</typeparam>
     /// <returns>Retrieves the endpoint methods for the specified class.</returns>
-    public T? GetEndpointMethods<T>( )
+    public T? GetEndpointMethods<T>() where T : class
     {
-        return (T?) _endpoints.Values
-            .FirstOrDefault(x => x.GetType( ) == typeof(T));
+        return _endpoints
+            .OfType<T>()
+            .FirstOrDefault();
     }
 
     private void InitializeEndpoint(ProviderInfo info)
@@ -45,7 +46,6 @@ public class CrideApi : IDisposable
         _endpoints = new()
         {
             { 
-                API_ENDPOINT.CHAT_COMPLETION, 
                 new ChatCompletion(
                     _llmInfo,
                     _httpClient)

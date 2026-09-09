@@ -37,15 +37,6 @@ public enum TOOL_CHOICE
 }
 
 [Flags]
-public enum API_ENDPOINT
-{
-    CHAT_COMPLETION,
-    EMBEDDING,
-    MODELS,
-    COUNT
-}
-
-[Flags]
 public enum TOOL_EXECUTION_MODE
 {
     OPENAI_LOOP,
