@@ -50,7 +50,7 @@ public class ChatCompletion
     /// </summary>
     private string? _lastFinishReason;
 
-    public ChatCompletion(ProviderInfo lLMInfo, HttpClient httpClient)
+    public ChatCompletion(HttpClient httpClient, ProviderInfo lLMInfo)
     {
         _requestBuilder =
        new ChatCompletionRequestBuilder(

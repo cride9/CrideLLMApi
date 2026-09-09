@@ -45,11 +45,8 @@ public class CrideApi : IDisposable
         }
         _endpoints = new()
         {
-            { 
-                new ChatCompletion(
-                    _llmInfo,
-                    _httpClient)
-            }
+            new ChatCompletion(_httpClient, _llmInfo),
+            new Embeddings(_httpClient, _llmInfo)
         };
     }
 
