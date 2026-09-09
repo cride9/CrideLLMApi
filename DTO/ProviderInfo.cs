@@ -14,4 +14,6 @@ public sealed record ProviderInfo
     public API_MODE ApiMode;
     public REASONING_EFFORT ReasoningEffort;
     public TOOL_CHOICE ToolChoice = TOOL_CHOICE.AUTO;
+    public TOOL_EXECUTION_MODE ToolExecutionMode { get; init; }
+    = TOOL_EXECUTION_MODE.OPENAI_LOOP;
 }

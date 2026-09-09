@@ -41,5 +41,25 @@ public enum API_ENDPOINT
 {
     CHAT_COMPLETION,
     EMBEDDING,
-    MODELS
+    MODELS,
+    COUNT
+}
+
+[Flags]
+public enum TOOL_EXECUTION_MODE
+{
+    OPENAI_LOOP,
+    ASYNC,
+    COUNT
+}
+
+[Flags]
+public enum ToolExecutionStatus
+{
+    QUEUED,
+    RUNNING,
+    COMPLETED,
+    FAILED,
+    CANCELLED,
+    COUNT
 }

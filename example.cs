@@ -16,7 +16,8 @@ class Example
             EndPoint = new Uri("http://127.0.0.1:8080"),
             Streaming = true,
             ReasoningEffort = REASONING_EFFORT.NONE,
-            ToolChoice = TOOL_CHOICE.AUTO
+            ToolChoice = TOOL_CHOICE.AUTO,
+            ToolExecutionMode = TOOL_EXECUTION_MODE.ASYNC
         });
 
         var chatCompletion = _api.GetEndpointMethods<ChatCompletion>( )!;
