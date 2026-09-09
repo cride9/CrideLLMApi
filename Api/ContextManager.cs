@@ -43,6 +43,54 @@ public class ContextManager
     }
 
     /// <summary>
+    /// Adds a user message to the chat history with the specified text and content parts.
+    /// </summary>
+    /// <param name="text">The text of the user message to add.</param>
+    /// <param name="contentParts">The content parts of the user message to add.</param>
+    public void AddUser(string text, params ChatContentPart[] contentParts)
+    {
+        var content = new List<ChatContentPart>();
+
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            content.Add(new TextContentPart
+            {
+                Text = text
+            });
+        }
+
+        content.AddRange(contentParts);
+
+        _chatHistory.Add(new ChatMessage
+        {
+            Role = REQUEST_ROLE.USER
+                .ToString()
+                .ToLower(),
+
+            Content = content
+        });
+    }
+
+    /// <summary>
+    /// Adds a user message to the chat history with the specified text and an image file.
+    /// </summary>
+    /// <param name="text">The text of the user message to add.</param>
+    /// <param name="filePath">The path to the image file.</param>
+    public void AddUserImage(string text, string filePath)
+    {
+        if (Uri.TryCreate(filePath, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp ||
+         uri.Scheme == Uri.UriSchemeHttps))
+        {
+            AddUser(text, ImageContent.FromUrl(filePath));
+        }
+        else
+        {
+            AddUser(text, ImageContent.FromFile(filePath));
+        }
+    }
+
+    /// <summary>
     /// Adds a system message to the chat history.
     /// </summary>
     /// <param name="content">The content of the system message to add.</param>
@@ -154,4 +202,6 @@ public class ContextManager
     /// <returns>A copy of the chat messages.</returns>
     public List<ChatMessage>? GetMemory( ) =>
         _chatHistory.Select(x => x with { }).ToList( );
+
+
 }

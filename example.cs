@@ -25,6 +25,8 @@ class Example
         ContextManager ctxManager = new( );
         chatCompletion.AddContextManager(ctxManager);
 
+        ctxManager.AddUserImage("What is on this picture?", "https://media.newyorker.com/photos/59095bb86552fa0be682d9d0/master/w_2560%2Cc_limit/Monkey-Selfie.jpg");
+
         chatCompletion.AddFunction<GetWeatherArgs>(new()
         {
             Name = "get_current_weather",
@@ -37,7 +39,7 @@ class Example
             Required = ["name", "unit"]
         }, GetCurrentWeather);
 
-        await foreach ( var item in chatCompletion.GetRawResponseAsync("Hows the weather in Budapest?") )
+        await foreach ( var item in chatCompletion.GetRawResponseAsync("Hows the weather in Budapest? And also what is on the image I sent you?") )
         {
             Console.Write(item.Choices[0].Delta.Content);
         }

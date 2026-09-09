@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace CrideLLMApi.DTO;
 
@@ -11,7 +8,7 @@ public sealed record ChatMessage
     public string? Role { get; init; }
 
     [JsonPropertyName("content")]
-    public string? Content { get; init; }
+    public object? Content { get; init; }
 
     [JsonPropertyName("tool_call_id")]
     public string? ToolCallId { get; init; }
