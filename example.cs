@@ -16,7 +16,9 @@ class Example
         Streaming = true,
         ReasoningEffort = REASONING_EFFORT.NONE,
         ToolChoice = TOOL_CHOICE.AUTO,
-        ToolExecutionMode = TOOL_EXECUTION_MODE.ASYNC
+        ToolExecutionMode = TOOL_EXECUTION_MODE.ASYNC,
+        EmbeddingModelName = "Qwen.Qwen3-VL-Embedding-2B.Q4_K_S",
+        ModelName = "Qwen3.5-2B-UD-Q4_K_XL"
     });
 
     // ContextManager creation example
@@ -48,7 +50,7 @@ class Example
         // Calculate the cosine similarity between two embeddings
         var similarity = embeddedText.CosineSimilarity(otherText);
 
-        Console.WriteLine($"Cosine Similarity: {similarity} (\"Hello world!\" and \"Hello world! This should be close in similarity!\")");
+        Console.WriteLine($"Cosine Similarity: {similarity} (Between: \"Hello world!\" and \"Hello world! This should be close in similarity!\")");
     }
 
     /// <summary>

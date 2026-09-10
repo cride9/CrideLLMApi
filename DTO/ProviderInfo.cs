@@ -8,6 +8,7 @@ namespace CrideLLMApi.DTO;
 public sealed record ProviderInfo
 {
     public string? ModelName;
+    public string? EmbeddingModelName;
     public string? ApiKey;
     public Uri EndPoint;
     public bool Streaming;

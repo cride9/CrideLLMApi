@@ -8,6 +8,7 @@ public sealed class Embeddings
 {
     private readonly EmbeddingRequestBuilder _requestBuilder;
     private readonly EmbeddingTransport _transport;
+    public string ModelName { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
