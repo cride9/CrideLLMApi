@@ -8,6 +8,7 @@ public sealed class Embeddings
 {
     private readonly EmbeddingRequestBuilder _requestBuilder;
     private readonly EmbeddingTransport _transport;
+    private readonly EmbeddingProviderOptions _options;
     public string ModelName { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -19,6 +20,7 @@ public sealed class Embeddings
     {
         _requestBuilder = new EmbeddingRequestBuilder(providerInfo);
         _transport = new EmbeddingTransport(httpClient);
+        _options = providerInfo.Embeddings;
     }
 
     /// <summary>
@@ -98,26 +100,25 @@ public sealed class Embeddings
     /// <exception cref="InvalidOperationException">Thrown when the embedding response contains no vectors.</exception>
     public async Task<EmbeddingVector> EmbedAsync(string input, CancellationToken cancellationToken = default)
     {
-        var response =
-            await CreateAsync(input, cancellationToken);
+        var response = await CreateAsync(input, cancellationToken);
 
         if (response.Data.Count == 0)
-        {
             throw new InvalidOperationException("The embedding response contained no vectors.");
-        }
 
-        var vector = response.Data
-                .OrderBy(x => x.Index)
-                .First()
-                .Embedding;
+        var values = response.Data
+            .OrderBy(x => x.Index)
+            .First()
+            .Embedding;
 
-        return new EmbeddingVector
+        var embedding = new EmbeddingVector
         {
-            Values = vector,
+            Values = values,
             Model = response.Model,
-            OriginalDimensions = vector.Length,
+            OriginalDimensions = values.Length,
             IsNormalized = false
         };
+
+        return ProcessEmbedding(embedding);
     }
 
     /// <summary>
@@ -134,16 +135,32 @@ public sealed class Embeddings
             .OrderBy(x => x.Index)
             .Select(x =>
             {
-                var vector = x.Embedding;
-
-                return new EmbeddingVector
+                var embedding = new EmbeddingVector
                 {
-                    Values = vector,
+                    Values = x.Embedding,
                     Model = response.Model,
-                    OriginalDimensions = vector.Length,
+                    OriginalDimensions = x.Embedding.Length,
                     IsNormalized = false
                 };
+
+                return ProcessEmbedding(embedding);
             })
             .ToArray();
+    }
+
+    /// <summary>
+    /// Processes an embedding vector according to the provider's options, such as normalizing and adjusting dimensions.
+    /// </summary>
+    /// <param name="embedding">The embedding vector to process.</param>
+    /// <returns>The processed embedding vector.</returns>
+    private EmbeddingVector ProcessEmbedding(EmbeddingVector embedding)
+    {
+        if (_options.TargetDimensions is int targetDimensions)
+            embedding = embedding.WithDimensions(targetDimensions);
+
+        if (_options.Normalize)
+            embedding = embedding.Normalize();
+
+        return embedding;
     }
 }

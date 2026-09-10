@@ -24,7 +24,7 @@ internal sealed class EmbeddingRequestBuilder
 
         return new EmbeddingRequest
         {
-            Model = model ?? _providerInfo.EmbeddingModelName,
+            Model = model ?? _providerInfo.Embeddings.ModelName,
             Input = input
         };
     }
@@ -49,7 +49,7 @@ internal sealed class EmbeddingRequestBuilder
 
         return new EmbeddingRequest
         {
-            Model = model ?? _providerInfo.EmbeddingModelName,
+            Model = model ?? _providerInfo.Embeddings.ModelName,
             Input = inputs
         };
     }

@@ -119,4 +119,32 @@ public static class EmbeddingExtensions
 
         return dot / (Math.Sqrt(leftMagnitude) * Math.Sqrt(rightMagnitude));
     }
+
+    /// <summary>
+    /// Returns a new embedding vector with the specified number of dimensions.
+    /// </summary>
+    /// <param name="embedding">The original embedding vector.</param>
+    /// <param name="targetDimensions">The desired number of dimensions.</param>
+    /// <returns>A new embedding vector with the specified number of dimensions.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the target dimensions are invalid.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the target dimensions exceed the original dimensions.</exception>
+    public static EmbeddingVector WithDimensions(this EmbeddingVector embedding, int targetDimensions)
+    {
+        ArgumentNullException.ThrowIfNull(embedding);
+
+        if (targetDimensions <= 0)
+            throw new ArgumentOutOfRangeException(nameof(targetDimensions));
+
+        if (targetDimensions > embedding.Dimensions)
+        {
+            throw new InvalidOperationException(
+                $"Cannot increase embedding dimensions from " +
+                $"{embedding.Dimensions} to {targetDimensions}.");
+        }
+
+        if (targetDimensions == embedding.Dimensions)
+            return embedding;
+
+        return embedding.Truncate(targetDimensions);
+    }
 }

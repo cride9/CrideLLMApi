@@ -11,10 +11,6 @@ public class CrideApi : IDisposable
     private HttpClient _httpClient;
     private List<object> _endpoints;
 
-    public CrideApi(Uri endpoint, string? apiKey = null, string? modelName = null, bool streaming = true) =>
-        InitializeEndpoint(new ProviderInfo() { EndPoint = endpoint, ApiKey = apiKey, ModelName = modelName, Streaming = streaming });
-    public CrideApi(string endpoint, string? apiKey = null, string? modelName = null, bool streaming = true) =>
-        InitializeEndpoint(new ProviderInfo() { EndPoint = new Uri(endpoint), ApiKey = apiKey, ModelName = modelName, Streaming = streaming });
     public CrideApi(ProviderInfo lLMInfo) =>
         InitializeEndpoint(lLMInfo);
 

@@ -20,12 +20,13 @@ internal sealed class ChatCompletionRequestBuilder
         _contextAccessor = contextAccessor;
     }
 
-    public ChatCompletionRequest Create(
-        IEnumerable<ChatMessage>? messages = null)
+    public ChatCompletionRequest Create(IEnumerable<ChatMessage>? messages = null)
     {
+        var chatOptions = _provider.Chat;
+
         return new ChatCompletionRequest
         {
-            Model = _provider.ModelName,
+            Model = chatOptions.ModelName,
             Messages =
                 messages ??
                 _contextAccessor()?.GetMessages() ??
@@ -33,15 +34,15 @@ internal sealed class ChatCompletionRequestBuilder
 
             Tools = _tools.Definitions,
 
-            Stream = _provider.Streaming,
+            Stream = chatOptions.Streaming,
 
             ReasoningEffort =
-                _provider.ReasoningEffort
+                chatOptions.ReasoningEffort
                     .ToString()
                     .ToLower(),
 
             ToolChoice =
-                _provider.ToolChoice
+                chatOptions.ToolChoice
                     .ToString()
                     .ToLower()
         };

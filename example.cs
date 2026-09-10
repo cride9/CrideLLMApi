@@ -13,12 +13,19 @@ class Example
     static CrideApi _api = new(new ProviderInfo()
     {
         EndPoint = new Uri("http://127.0.0.1:8080"),
-        Streaming = true,
-        ReasoningEffort = REASONING_EFFORT.NONE,
-        ToolChoice = TOOL_CHOICE.AUTO,
-        ToolExecutionMode = TOOL_EXECUTION_MODE.ASYNC,
-        EmbeddingModelName = "Qwen.Qwen3-VL-Embedding-2B.Q4_K_S",
-        ModelName = "Qwen3.5-2B-UD-Q4_K_XL"
+        Chat = new()
+        {
+            ModelName = "Qwen3.5-2B-UD-Q4_K_XL",
+            ReasoningEffort = REASONING_EFFORT.NONE,
+            Streaming = true,
+            ToolChoice = TOOL_CHOICE.AUTO,
+            ToolExecutionMode = TOOL_EXECUTION_MODE.ASYNC
+        },
+        Embeddings = new()
+        {
+            ModelName = "Qwen.Qwen3-VL-Embedding-2B.Q4_K_S",
+            TargetDimensions = 512
+        }
     });
 
     // ContextManager creation example
@@ -45,7 +52,7 @@ class Example
         var otherText = (await embedding.EmbedAsync("Hello world! This should be close in similarity!")).Normalize();
 
         // Truncate and normalize the embedding vector with the Extension if needed
-        var truncatedEmbedding1 = embeddedText.Truncate(1024).Normalize();
+        var truncatedEmbedding1 = embeddedText.Truncate(512).Normalize();
 
         // Calculate the cosine similarity between two embeddings
         var similarity = embeddedText.CosineSimilarity(otherText);
