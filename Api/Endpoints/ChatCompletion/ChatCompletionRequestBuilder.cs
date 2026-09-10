@@ -20,6 +20,11 @@ internal sealed class ChatCompletionRequestBuilder
         _contextAccessor = contextAccessor;
     }
 
+    /// <summary>
+    /// Creates a new ChatCompletionRequest with the specified messages or retrieves them from the context if not provided.
+    /// </summary>
+    /// <param name="messages">The chat messages.</param>
+    /// <returns>The created chat completion request.</returns>
     public ChatCompletionRequest Create(IEnumerable<ChatMessage>? messages = null)
     {
         var chatOptions = _provider.Chat;
@@ -48,9 +53,13 @@ internal sealed class ChatCompletionRequestBuilder
         };
     }
 
-    public ChatCompletionRequest CreateWithMessage(
-        REQUEST_ROLE role,
-        string content)
+    /// <summary>
+    /// Creates a new ChatCompletionRequest with a single message.
+    /// </summary>
+    /// <param name="role">The role of the message sender.</param>
+    /// <param name="content">The message content.</param>
+    /// <returns>The created chat completion request.</returns>
+    public ChatCompletionRequest CreateWithMessage(REQUEST_ROLE role, string content)
     {
         _contextAccessor()?.Add(
             new ChatMessage

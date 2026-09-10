@@ -9,7 +9,6 @@ public sealed class Embeddings
     private readonly EmbeddingRequestBuilder _requestBuilder;
     private readonly EmbeddingTransport _transport;
     private readonly EmbeddingProviderOptions _options;
-    public string ModelName { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -61,7 +60,15 @@ public sealed class Embeddings
     {
         using var response = await _transport.SendAsync(request, cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content
+                .ReadAsStringAsync(cancellationToken);
+
+            throw new CrideApiException(
+                response.StatusCode,
+                body);
+        }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
 
@@ -105,20 +112,9 @@ public sealed class Embeddings
         if (response.Data.Count == 0)
             throw new InvalidOperationException("The embedding response contained no vectors.");
 
-        var values = response.Data
-            .OrderBy(x => x.Index)
-            .First()
-            .Embedding;
-
-        var embedding = new EmbeddingVector
-        {
-            Values = values,
-            Model = response.Model,
-            OriginalDimensions = values.Length,
-            IsNormalized = false
-        };
-
-        return ProcessEmbedding(embedding);
+        return CreateVector(
+            response.Data.OrderBy(x => x.Index).First(),
+            response.Model);
     }
 
     /// <summary>
@@ -133,18 +129,7 @@ public sealed class Embeddings
 
         return response.Data
             .OrderBy(x => x.Index)
-            .Select(x =>
-            {
-                var embedding = new EmbeddingVector
-                {
-                    Values = x.Embedding,
-                    Model = response.Model,
-                    OriginalDimensions = x.Embedding.Length,
-                    IsNormalized = false
-                };
-
-                return ProcessEmbedding(embedding);
-            })
+            .Select(x => CreateVector(x, response.Model))
             .ToArray();
     }
 
@@ -162,5 +147,22 @@ public sealed class Embeddings
             embedding = embedding.Normalize();
 
         return embedding;
+    }
+
+    /// <summary>
+    /// Creates an EmbeddingVector from EmbeddingData and model information.
+    /// </summary>
+    /// <param name="data">The embedding data.</param>
+    /// <param name="model">The model information.</param>
+    /// <returns>The created embedding vector.</returns>
+    private EmbeddingVector CreateVector(EmbeddingData data, string? model)
+    {
+        return ProcessEmbedding(new EmbeddingVector
+        {
+            Values = data.Embedding,
+            Model = model,
+            OriginalDimensions = data.Embedding.Length,
+            IsNormalized = false
+        });
     }
 }

@@ -92,32 +92,25 @@ public static class EmbeddingExtensions
     /// <param name="left">The first embedding vector.</param>
     /// <param name="right">The second embedding vector.</param>
     /// <returns>The cosine similarity between the two vectors.</returns>
-    /// <exception cref="ArgumentException">Thrown when the embedding dimensions do not match.</exception>
     public static double CosineSimilarity(this EmbeddingVector left, EmbeddingVector right)
     {
-        if (left.Dimensions != right.Dimensions)
+        ValidateSameDimensions(left, right);
+
+        if (left.IsNormalized == true &&
+            right.IsNormalized == true)
         {
-            throw new ArgumentException("Embedding dimensions must match.");
+            return left.DotProduct(right);
         }
 
-        double dot = 0;
-        double leftMagnitude = 0;
-        double rightMagnitude = 0;
+        var leftMagnitude = left.Magnitude();
+        var rightMagnitude = right.Magnitude();
 
-        for (var i = 0; i < left.Dimensions; i++)
-        {
-            var a = left.Values[i];
-            var b = right.Values[i];
-
-            dot += a * b;
-            leftMagnitude += a * a;
-            rightMagnitude += b * b;
-        }
-
-        if (leftMagnitude == 0 || rightMagnitude == 0)
+        if (leftMagnitude == 0 ||
+            rightMagnitude == 0)
             return 0;
 
-        return dot / (Math.Sqrt(leftMagnitude) * Math.Sqrt(rightMagnitude));
+        return left.DotProduct(right) /
+               (leftMagnitude * rightMagnitude);
     }
 
     /// <summary>
@@ -146,5 +139,63 @@ public static class EmbeddingExtensions
             return embedding;
 
         return embedding.Truncate(targetDimensions);
+    }
+
+    /// <summary>
+    /// Validates that two embedding vectors have the same number of dimensions.
+    /// </summary>
+    /// <param name="left">The first embedding vector.</param>
+    /// <param name="right">The second embedding vector.</param>
+    /// <returns>The dot product of the two vectors.</returns>
+    public static double DotProduct(this EmbeddingVector left, EmbeddingVector right)
+    {
+        ValidateSameDimensions(left, right);
+
+        double dot = 0;
+
+        for (var i = 0; i < left.Dimensions; i++)
+            dot += left.Values[i] * right.Values[i];
+
+        return dot;
+    }
+
+    /// <summary>
+    /// Calculates the Euclidean distance between two embedding vectors.
+    /// </summary>
+    /// <param name="left">The first embedding vector.</param>
+    /// <param name="right">The second embedding vector.</param>
+    /// <returns>The Euclidean distance between the two vectors.</returns>
+    public static double EuclideanDistance(this EmbeddingVector left, EmbeddingVector right)
+    {
+        ValidateSameDimensions(left, right);
+
+        double sum = 0;
+
+        for (var i = 0; i < left.Dimensions; i++)
+        {
+            var diff = left.Values[i] - right.Values[i];
+            sum += diff * diff;
+        }
+
+        return Math.Sqrt(sum);
+    }
+
+    /// <summary>
+    /// Validates that two embedding vectors have the same number of dimensions.
+    /// </summary>
+    /// <param name="left">The first embedding vector.</param>
+    /// <param name="right">The second embedding vector.</param>
+    /// <exception cref="ArgumentException">Throws if any EmbeddingVector is null</exception>
+    private static void ValidateSameDimensions(EmbeddingVector left, EmbeddingVector right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+
+        if (left.Dimensions != right.Dimensions)
+        {
+            throw new ArgumentException(
+                $"Embedding dimensions must match. " +
+                $"Left: {left.Dimensions}, Right: {right.Dimensions}.");
+        }
     }
 }

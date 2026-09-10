@@ -127,13 +127,17 @@ public class ChatCompletion
     }
 
     /// <summary>
-    /// Adds a function to the ChatCompletion instance, allowing it to be called during the conversation. Optionally, a handler can be provided to execute the function when it is called. The function is added to the list of available API functions, and if a handler is provided, it is stored in the tool handlers dictionary for execution.
+    /// Registers a tool definition and optionally associates an executor with it.
     /// </summary>
-    /// <param name="function">The function to add.</param>
-    /// <param name="handler">The handler to execute the function.</param>
-    public void AddFunction(
-        ApiFunction function,
-        ToolExecutor? handler = null)
+    /// <param name="function">
+    /// The tool definition describing the function name, description, parameters,
+    /// and other metadata exposed to the model.
+    /// </param>
+    /// <param name="handler">
+    /// The optional executor invoked when the registered tool is called.
+    /// If no handler is provided, only the tool definition is registered.
+    /// </param>
+    public void AddFunction(ApiFunction function, ToolExecutor? handler = null)
     {
         _tools.Register(function, handler);
     }

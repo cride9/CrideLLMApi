@@ -24,9 +24,14 @@ public sealed class ToolScheduler
     public IReadOnlyCollection<ToolExecution> Executions =>
         _executions.Values.ToArray();
 
-    public ToolExecution Schedule(
-        ToolCall call,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Schedules a tool call for execution.
+    /// </summary>
+    /// <param name="call">The tool call to schedule.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The scheduled tool execution.</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public ToolExecution Schedule(ToolCall call, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
 
@@ -51,9 +56,28 @@ public sealed class ToolScheduler
         return execution;
     }
 
-    private async Task<string> ExecuteAsync(
-        ToolExecution execution,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Executes the specified tool call asynchronously and updates the associated
+    /// <see cref="ToolExecution"/> state throughout the execution lifecycle.
+    /// </summary>
+    /// <param name="execution">
+    /// The tool execution instance containing the tool call and its current execution state.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// A token that can be used to cancel the execution before or during processing.
+    /// </param>
+    /// <returns>
+    /// A task that represents the asynchronous tool execution.
+    /// The task result contains the string returned by the registered tool handler.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the tool call does not contain a valid function name, or when no executable
+    /// handler is registered for the requested tool.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// Thrown when the operation is cancelled through <paramref name="cancellationToken"/>.
+    /// </exception>
+    private async Task<string> ExecuteAsync(ToolExecution execution, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -112,15 +136,23 @@ public sealed class ToolScheduler
         }
     }
 
-    public bool TryGet(
-        string callId,
-        out ToolExecution? execution)
+    /// <summary>
+    /// Attempts to retrieve the <see cref="ToolExecution"/> associated with the specified call ID.
+    /// </summary>
+    /// <param name="callId">The ID of the tool call to retrieve.</param>
+    /// <param name="execution">The tool execution instance if found; otherwise, null.</param>
+    /// <returns>true if the tool execution is found; otherwise, false.</returns>
+    public bool TryGet(string callId, out ToolExecution? execution)
     {
         return _executions.TryGetValue(
             callId,
             out execution);
     }
 
+    /// <summary>
+    /// Retrieves all tool executions that are currently pending, which includes those that are queued or running.
+    /// </summary>
+    /// <returns>An enumerable of pending tool executions.</returns>
     public IEnumerable<ToolExecution> GetPending()
     {
         return _executions.Values.Where(x =>
@@ -128,12 +160,20 @@ public sealed class ToolScheduler
             or ToolExecutionStatus.RUNNING);
     }
 
+    /// <summary>
+    /// Retrieves all tool executions that have completed, which includes those that are completed, failed, or cancelled.
+    /// </summary>
+    /// <returns></returns>
     public IEnumerable<ToolExecution> GetCompleted()
     {
         return _executions.Values.Where(x =>
             x.Status == ToolExecutionStatus.COMPLETED);
     }
 
+    /// <summary>
+    /// Flushes all pending tool executions by awaiting their completion. This method will wait for all queued and running
+    /// </summary>
+    /// <returns>An array of the flushed tool executions.</returns>
     public async Task<ToolExecution[]> FlushAsync()
     {
         var pending = GetPending().ToArray();
@@ -155,6 +195,9 @@ public sealed class ToolScheduler
         return pending;
     }
 
+    /// <summary>
+    /// Clears all completed tool executions from the scheduler, including those that have completed successfully, failed, or were cancelled.
+    /// </summary>
     public void ClearCompleted()
     {
         foreach (var pair in _executions)
@@ -171,6 +214,11 @@ public sealed class ToolScheduler
         }
     }
 
+    /// <summary>
+    /// Generates a unique execution key for the given <see cref="ToolCall"/>. If the call has an explicit ID, that ID is used; otherwise, a new GUID-based key is generated.
+    /// </summary>
+    /// <param name="call">The tool call for which to generate an execution key.</param>
+    /// <returns>The unique execution key.</returns>
     private static string GetExecutionKey(ToolCall call)
     {
         if (!string.IsNullOrWhiteSpace(call.Id))

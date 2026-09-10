@@ -14,4 +14,11 @@ public sealed record EmbeddingVector
 
     public static implicit operator float[](EmbeddingVector embedding)
         => embedding.Values;
+
+    public ReadOnlySpan<float> Span => Values;
+
+    public float this[int index] => Values[index];
+
+    public override string ToString()
+        => $"{Model ?? "Unknown"} embedding [{Dimensions}D]";
 }

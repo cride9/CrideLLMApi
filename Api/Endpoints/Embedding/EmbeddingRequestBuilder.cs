@@ -43,9 +43,18 @@ internal sealed class EmbeddingRequestBuilder
         var inputs = input.ToArray();
 
         if (inputs.Length == 0)
+        {
             throw new ArgumentException(
                 "At least one input is required.",
                 nameof(input));
+        }
+
+        if (inputs.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException(
+                "Embedding inputs cannot contain null, empty, or whitespace-only strings.",
+                nameof(input));
+        }
 
         return new EmbeddingRequest
         {

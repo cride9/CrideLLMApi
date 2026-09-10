@@ -19,9 +19,13 @@ internal sealed class ChatCompletionTransport
         _httpClient = httpClient;
     }
 
-    public async Task<HttpResponseMessage> SendAsync(
-        object requestBody,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Sends a request to the OpenAI API for chat completions.
+    /// </summary>
+    /// <param name="requestBody">The request body.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The HTTP response message.</returns>
+    public async Task<HttpResponseMessage> SendAsync(object requestBody, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(
             HttpMethod.Post,
