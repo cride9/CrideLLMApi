@@ -23,6 +23,12 @@ public sealed class ToolRegistry
     public IEnumerable<RegisteredTool> Tools =>
         _tools.Values;
 
+    private static readonly JsonSerializerOptions ToolJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
+
     /// <summary>
     /// Registers a tool with the specified function definition and an optional executor handler. The function definition is converted to a FunctionCallObject, which is stored along with the executor in the registry. If no executor is provided, the tool will be registered without an execution logic.
     /// </summary>
@@ -54,7 +60,7 @@ public sealed class ToolRegistry
 
         ToolExecutor executor = async argumentsJson =>
         {
-            var args = JsonSerializer.Deserialize<TArgs>(argumentsJson)
+            var args = JsonSerializer.Deserialize<TArgs>(argumentsJson, ToolJsonOptions)
                 ?? throw new JsonException(
                     $"Failed to deserialize arguments for tool '{function.Name}'.");
 
