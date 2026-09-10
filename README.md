@@ -36,6 +36,9 @@ At the same time, higher-level helpers are available for ordinary conversations 
 * **Streaming-first API** using `IAsyncEnumerable<T>`
 * **Raw SSE access** through `ChatCompletionChunk`
 * **Reasoning stream access** through `reasoning_content`
+* **Multimodal image input** from URLs, local files, or byte arrays
+* **OpenAI-compatible embeddings endpoint**
+* **Embedding vector helpers** for normalization, truncation, similarity, and distance
 * **OpenAI-compatible tool/function calling**
 * **Strongly typed tool arguments**
 * **Concurrent tool execution**
@@ -94,9 +97,19 @@ using CrideLLMApi.Helpers;
 var api = new CrideApi(new ProviderInfo
 {
     EndPoint = new Uri("http://127.0.0.1:8080"),
-    Streaming = true,
-    ReasoningEffort = REASONING_EFFORT.NONE,
-    ToolChoice = TOOL_CHOICE.AUTO
+    Chat = new()
+    {
+        ModelName = "chat-model",
+        Streaming = true,
+        ReasoningEffort = REASONING_EFFORT.NONE,
+        ToolChoice = TOOL_CHOICE.AUTO
+    },
+    Embeddings = new()
+    {
+        ModelName = "embedding-model",
+        TargetDimensions = 512,
+        Normalize = true
+    }
 });
 ```
 
@@ -204,6 +217,26 @@ A copy of the current memory can be retrieved with:
 ```csharp
 var memory = context.GetMemory();
 ```
+
+## Image input
+
+User messages can contain OpenAI-compatible text and image content parts.
+
+```csharp
+context.AddUserImage(
+    "What is on this image?",
+    "https://example.com/image.png");
+```
+
+Local files are supported as well:
+
+```csharp
+context.AddUserImage(
+    "Describe this image.",
+    @"C:\images\photo.jpg");
+```
+
+For manual content construction, `ImageContent.FromUrl`, `ImageContent.FromFile`, and `ImageContent.FromBytes` are also available.
 
 ---
 
@@ -671,6 +704,41 @@ IEnumerable<FunctionCallObject> functions =
 
 ---
 
+# Embeddings
+
+Retrieve the embeddings endpoint through the same `CrideApi` instance:
+
+```csharp
+var embeddings =
+    api.GetEndpointMethods<Embeddings>();
+```
+
+Embed one value or a batch:
+
+```csharp
+var first = await embeddings!.EmbedAsync("Hello world!");
+
+var batch = await embeddings.EmbedAsync(
+    ["first text", "second text"]);
+```
+
+`EmbeddingProviderOptions` can automatically truncate returned vectors and normalize them. Vector helpers are also available directly:
+
+```csharp
+var normalized = first.Normalize();
+var truncated = first.Truncate(512).Normalize();
+
+var similarity =
+    normalized.CosineSimilarity(otherVector);
+
+var distance =
+    normalized.EuclideanDistance(otherVector);
+```
+
+For lower-level access, `CreateRequest`, `CreateAsync`, and `GetRawResponseAsync` expose the request/response layer for `POST /v1/embeddings`.
+
+---
+
 # Provider Configuration
 
 `ProviderInfo` configures the underlying LLM endpoint.
@@ -679,10 +747,19 @@ IEnumerable<FunctionCallObject> functions =
 var provider = new ProviderInfo
 {
     EndPoint = new Uri("http://127.0.0.1:8080"),
-    ModelName = "model-name",
-    Streaming = true,
-    ReasoningEffort = REASONING_EFFORT.NONE,
-    ToolChoice = TOOL_CHOICE.AUTO
+    Chat = new()
+    {
+        ModelName = "chat-model",
+        Streaming = true,
+        ReasoningEffort = REASONING_EFFORT.NONE,
+        ToolChoice = TOOL_CHOICE.AUTO
+    },
+    Embeddings = new()
+    {
+        ModelName = "embedding-model",
+        TargetDimensions = 512,
+        Normalize = true
+    }
 };
 ```
 
@@ -693,8 +770,11 @@ var provider = new ProviderInfo
 {
     EndPoint = new Uri("https://api.openai.com"),
     ApiKey = "sk-...",
-    ModelName = "model-name",
-    Streaming = true
+    Chat = new()
+    {
+        ModelName = "model-name",
+        Streaming = true
+    }
 };
 ```
 
@@ -710,15 +790,17 @@ and switches to OpenAI-compatible authenticated mode.
 
 # ProviderInfo
 
-| Field             | Type               | Description                                   |
-| ----------------- | ------------------ | --------------------------------------------- |
-| `EndPoint`        | `Uri`              | Base URL of the API server                    |
-| `ApiKey`          | `string?`          | Optional bearer token                         |
-| `ModelName`       | `string?`          | Model sent with requests                      |
-| `Streaming`       | `bool`             | Enables response streaming                    |
-| `ApiMode`         | `API_MODE`         | Local or authenticated OpenAI-compatible mode |
-| `ReasoningEffort` | `REASONING_EFFORT` | Requested reasoning effort                    |
-| `ToolChoice`      | `TOOL_CHOICE`      | Tool selection behavior                       |
+| Field        | Type                       | Description                                   |
+| ------------ | -------------------------- | --------------------------------------------- |
+| `EndPoint`   | `Uri`                      | Base URL of the API server                    |
+| `ApiKey`     | `string?`                  | Optional bearer token                         |
+| `Chat`       | `ChatProviderOptions`      | Chat completion configuration                 |
+| `Embeddings` | `EmbeddingProviderOptions` | Embedding endpoint configuration              |
+| `ApiMode`    | `API_MODE`                 | Local or authenticated OpenAI-compatible mode |
+
+`ChatProviderOptions` contains `ModelName`, `Streaming`, `ReasoningEffort`, `ToolChoice`, and `ToolExecutionMode`.
+
+`EmbeddingProviderOptions` contains `ModelName`, `TargetDimensions`, and `Normalize`.
 
 ---
 
@@ -731,6 +813,9 @@ Endpoints can be retrieved by type:
 ```csharp
 var chatCompletion =
     api.GetEndpointMethods<ChatCompletion>();
+
+var embeddings =
+    api.GetEndpointMethods<Embeddings>();
 ```
 
 The endpoint registry is intentionally lightweight and does not require an external dependency injection framework.
@@ -744,7 +829,7 @@ endpoint registry
    ↓
 GetEndpointMethods<T>()
    ↓
-ChatCompletion
+ChatCompletion / Embeddings
 ```
 
 ---
@@ -791,6 +876,15 @@ REQUIRED
 
 Controls whether tool usage is optional or required.
 
+## TOOL_EXECUTION_MODE
+
+```text
+OPENAI_LOOP
+ASYNC
+```
+
+Configures the selected tool execution mode for chat providers.
+
 ---
 
 # Architecture
@@ -800,7 +894,7 @@ CrideLLMApi separates API responsibilities instead of placing all behavior insid
 ```text
 CrideApi
 │
-└── ChatCompletion
+├── ChatCompletion
     │
     ├── ContextManager
     │
@@ -813,6 +907,10 @@ CrideApi
     └── ToolScheduler
     │
     └── streaming / SSE processing
+│
+└── Embeddings
+    ├── EmbeddingRequestBuilder
+    └── EmbeddingTransport
 ```
 
 ### ChatCompletion
@@ -869,7 +967,10 @@ CrideLLMApi/
 │   ├── Endpoints/
 │   │   ├── ChatCompletion.cs
 │   │   ├── ChatCompletionRequestBuilder.cs
-│   │   └── ChatCompletionTransport.cs
+│   │   ├── ChatCompletionTransport.cs
+│   │   ├── Embeddings.cs
+│   │   ├── EmbeddingRequestBuilder.cs
+│   │   └── EmbeddingTransport.cs
 │   │
 │   └── Tools/
 │       ├── RegisteredTool.cs
@@ -885,7 +986,9 @@ CrideLLMApi/
 │   └── ResponseJson.cs
 │
 ├── Helpers/
-│   └── ApiFlags.cs
+│   ├── ApiFlags.cs
+│   ├── ImageContent.cs
+│   └── EmbeddingExtensions.cs
 │
 ├── example.cs
 ├── CrideLLMApi.csproj
