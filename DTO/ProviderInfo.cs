@@ -24,6 +24,24 @@ public sealed record ChatProviderOptions
     public REASONING_EFFORT ReasoningEffort { get; init; } = REASONING_EFFORT.NONE;
     public TOOL_CHOICE ToolChoice { get; init; } = TOOL_CHOICE.AUTO;
     public TOOL_EXECUTION_MODE ToolExecutionMode { get; init; } = TOOL_EXECUTION_MODE.OPENAI_LOOP;
+
+    /// <summary>
+    /// The maximum number of tokens to generate. When null, the provider's
+    /// default is used.
+    /// </summary>
+    public int? MaxTokens { get; init; }
+
+    /// <summary>
+    /// The sampling temperature. Lower values make the output more
+    /// deterministic. When null, the provider's default is used.
+    /// </summary>
+    public double? Temperature { get; init; }
+
+    /// <summary>
+    /// When false, the model's reasoning/thinking mode is disabled. When null,
+    /// the provider's default is used.
+    /// </summary>
+    public bool? EnableThinking { get; init; }
 }
 
 /// <summary>

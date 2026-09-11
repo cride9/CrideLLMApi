@@ -49,7 +49,16 @@ internal sealed class ChatCompletionRequestBuilder
             ToolChoice =
                 chatOptions.ToolChoice
                     .ToString()
-                    .ToLower()
+                    .ToLower(),
+
+            MaxTokens = chatOptions.MaxTokens,
+
+            Temperature = chatOptions.Temperature,
+
+            ChatTemplateKwargs =
+                chatOptions.EnableThinking is bool enableThinking
+                    ? new ChatTemplateOptions { EnableThinking = enableThinking }
+                    : null
         };
     }
 
