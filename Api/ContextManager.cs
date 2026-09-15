@@ -189,7 +189,7 @@ public class ContextManager
     /// </summary>
     /// <param name="memory">The memory to initialize the chat history with.</param>
     /// <returns>The new list of chat messages.</returns>
-    public List<ChatMessage> NewMemory(List<ChatMessage> memory)
+    public List<ChatMessage> NewMemory(IEnumerable<ChatMessage> memory)
     {
         _chatHistory.Clear( );
         _chatHistory.AddRange(memory);

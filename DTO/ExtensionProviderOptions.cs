@@ -10,4 +10,10 @@ public sealed record ExtensionProviderOptions
     public Uri? VectorDBEndPoint { get; init; }
 
     public string? VectorDBApiKey { get; init; }
+
+    public bool AutoStartVectorDB { get; init; } = true;
+
+    public string? VectorDBRuntimePath { get; init; }
+
+    public string? VectorDBDataPath { get; init; }
 }
