@@ -74,13 +74,23 @@ Examples include:
 
 # Installation
 
-Clone the repository and add a project reference:
+Install the package from NuGet:
+
+```text
+dotnet add package CrideLLMApi
+```
+
+The library targets `net10.0`. Extension packages such as `CrideLLMApi.VectorDB.ChromaDB`
+register themselves automatically when they are referenced.
+
+For local development a project reference works as well:
 
 ```xml
 <ProjectReference Include="..\CrideLLMApi\CrideLLMApi.csproj" />
 ```
 
-NuGet packaging may be added later.
+The example console application lives in a separate folder (`CrideLLMApi.Example`), so the
+library package does not ship sample code.
 
 ---
 
@@ -184,8 +194,11 @@ This replaces the existing system instruction instead of appending another one.
 ## Add multiple messages
 
 ```csharp
-context.AddRange(messages);
+foreach (var message in messages)
+    context.Add(message);
 ```
+
+`NewMemory(messages)` replaces the whole conversation in one call.
 
 ## Read conversation history
 
@@ -832,6 +845,36 @@ GetEndpointMethods<T>()
 ChatCompletion / Embeddings
 ```
 
+`GetEndpointMethods<T>()` returns `null` when no endpoint of the requested type is registered, so
+check the result before using it.
+
+The endpoints that can be retrieved are:
+
+| Endpoint          | Purpose                                                        |
+| ----------------- | -------------------------------------------------------------- |
+| `ChatCompletion`  | Chat completions, streaming, tool calling and the automatic tool loop |
+| `Embeddings`      | OpenAI-compatible `POST /v1/embeddings`                        |
+
+## Extension access
+
+`GetExtension<T>()` returns the configured extension. The only extension family the library
+exposes is the vector database:
+
+```csharp
+var database = api.GetExtension<ChromaDatabase>();
+```
+
+The extension is created from `ProviderInfo.Extensions.VectorDB`. It is only available when:
+
+* `VectorDB` is not `VectorDatabaseType.NONE`, and
+* a provider for that `VectorDatabaseType` was registered through
+  `VectorDatabaseRegistry.Register`. Extension packages do this automatically from a module
+  initializer, for example `CrideLLMApi.VectorDB.ChromaDB` registers `ChromaDatabase` for
+  `VectorDatabaseType.CHROMADB`.
+
+No provider ships for `VectorDatabaseType.QDRANT` at this time. When the extension is not
+configured, or when the created instance is not assignable to `T`, the method returns `null`.
+
 ---
 
 # Enums
@@ -884,6 +927,67 @@ ASYNC
 ```
 
 Configures the selected tool execution mode for chat providers.
+
+`OPENAI_LOOP` is implemented: the library executes the tool calls requested by the model
+automatically. `ASYNC` is reserved and **not implemented yet** - the value is accepted in the
+configuration but does not change the behavior.
+
+---
+
+# Error Handling
+
+CrideLLMApi reports failures instead of failing silently.
+
+```text
+provider or configuration problem   ->  CrideApiException
+invalid argument from the caller    ->  ArgumentException family
+caller cancelled the operation      ->  OperationCanceledException
+```
+
+`CrideApiException` carries the context needed to fix the problem:
+
+| Property         | Meaning                                                         |
+| ---------------- | --------------------------------------------------------------- |
+| `StatusCode`     | The HTTP status code when the failure came from a response       |
+| `ResponseBody`   | The (truncated) provider response body, when there is one        |
+| `Component`      | The library component that failed, for example `ChatCompletion`  |
+| `Operation`      | The failed operation, including the target address               |
+| `Hint`           | What to change to fix the problem                                |
+| `InnerException` | The original exception, when there is one                        |
+
+```csharp
+try
+{
+    await foreach (var delta in chatCompletion.GetResponseAsync("Hello"))
+        Console.Write(delta.Content);
+}
+catch (CrideApiException ex)
+{
+    Console.WriteLine($"{ex.Component} / {ex.Operation}: {ex.Message}");
+
+    if (ex.Hint is not null)
+        Console.WriteLine($"Hint: {ex.Hint}");
+}
+```
+
+Typical failures that now produce a readable error instead of an empty stream or a
+`NullReferenceException`:
+
+* an unsuccessful HTTP status from the provider (401, 404, 500, ...), including its error message
+* an unreachable or misconfigured endpoint (`ProviderInfo.EndPoint`)
+* a missing model name that the configured provider mode requires
+* `ProviderInfo.Chat.Streaming` set to `false`, which is not supported yet
+* a response that is not an SSE stream, for example a `stream: false` answer
+* a chat completion chunk that cannot be deserialized
+* the automatic tool loop when no `ContextManager` is attached, or when it exceeds its maximum
+  round count
+* a vector database type without a registered provider
+* an embedding payload without usable vectors, or `TargetDimensions` larger than the provider vector
+
+Configuration is also validated before a request is sent: a blank or duplicate tool name, an
+`EndPoint` that is not an absolute HTTP(S) URI, a non-positive `MaxTokens`, a negative
+`Temperature`, or `TargetDimensions` that are not positive fail immediately and name the option to
+fix.
 
 ---
 
@@ -965,32 +1069,44 @@ CrideLLMApi/
 │   ├── ContextManager.cs
 │   │
 │   ├── Endpoints/
-│   │   ├── ChatCompletion.cs
-│   │   ├── ChatCompletionRequestBuilder.cs
-│   │   ├── ChatCompletionTransport.cs
-│   │   ├── Embeddings.cs
-│   │   ├── EmbeddingRequestBuilder.cs
-│   │   └── EmbeddingTransport.cs
+│   │   ├── ApiResponseValidator.cs
+│   │   ├── ChatCompletion/
+│   │   │   ├── ChatCompletion.cs
+│   │   │   ├── ChatCompletionRequestBuilder.cs
+│   │   │   └── ChatCompletionTransport.cs
+│   │   └── Embedding/
+│   │       ├── Embeddings.cs
+│   │       ├── EmbeddingRequestBuilder.cs
+│   │       └── EmbeddingTransport.cs
 │   │
 │   └── Tools/
-│       ├── RegisteredTool.cs
 │       ├── ToolExecution.cs
 │       ├── ToolRegistry.cs
 │       └── ToolScheduler.cs
 │
 ├── DTO/
-│   ├── ApiFunction.cs
-│   ├── ChatCompletionRequest.cs
-│   ├── ChatMessage.cs
-│   ├── ProviderInfo.cs
-│   └── ResponseJson.cs
+│   ├── Chat/
+│   ├── Embeddings/
+│   ├── ExtensionProviderOptions.cs
+│   └── ProviderInfo.cs
 │
 ├── Helpers/
 │   ├── ApiFlags.cs
+│   ├── CrideApiException.cs
 │   ├── ImageContent.cs
-│   └── EmbeddingExtensions.cs
+│   ├── VectorCollectionExtensions.cs
+│   └── Embedding/
+│       ├── EmbeddingExtensions.cs
+│       └── EmbeddingVector.cs
 │
-├── example.cs
+├── VectorDB/
+│   ├── IVectorCollection.cs
+│   ├── IVectorDatabase.cs
+│   ├── IVectorDatabaseProvider.cs
+│   ├── VectorDatabaseRegistry.cs
+│   ├── VectorRecord.cs
+│   └── VectorSearchResult.cs
+│
 ├── CrideLLMApi.csproj
 └── CrideLLMApi.slnx
 ```

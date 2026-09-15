@@ -1,7 +1,5 @@
 ﻿using CrideLLMApi.DTO;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using CrideLLMApi.Helpers;
 using System.Text.Json;
 
 namespace CrideLLMApi.Api.Tools;
@@ -13,13 +11,25 @@ namespace CrideLLMApi.Api.Tools;
 /// <returns>A Task that resolves to the result of the tool execution.</returns>
 public delegate Task<string> ToolExecutor(string argumentsJson);
 
+/// <summary>
+/// Registry of the tool definitions and their executors for a chat conversation. A tool is
+/// identified by its function name, so the name must be unique.
+/// </summary>
 public sealed class ToolRegistry
 {
-    private readonly Dictionary<string, RegisteredTool> _tools = new();
+    private const string ComponentName = "ToolRegistry";
 
+    private readonly Dictionary<string, RegisteredTool> _tools = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Gets the tool definitions that are exposed to the model.
+    /// </summary>
     public IEnumerable<FunctionCallObject> Definitions =>
         _tools.Values.Select(x => x.Definition);
 
+    /// <summary>
+    /// Gets the registered tools, including their optional executors.
+    /// </summary>
     public IEnumerable<RegisteredTool> Tools =>
         _tools.Values;
 
@@ -34,35 +44,104 @@ public sealed class ToolRegistry
     /// </summary>
     /// <param name="function">The API function to register.</param>
     /// <param name="handler">The executor handler for the tool.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="function"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the function has no name, or when a tool with the same name is already
+    /// registered. The model calls tools by name, so silently replacing a tool would change the
+    /// behavior of an existing conversation.
+    /// </exception>
     public void Register(ApiFunction function, ToolExecutor? handler = null)
     {
         ArgumentNullException.ThrowIfNull(function);
 
+        var name = function.Name;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException(
+                "The tool definition must have a non-empty function name.",
+                nameof(function));
+        }
+
+        if (_tools.ContainsKey(name))
+        {
+            throw new ArgumentException(
+                $"A tool named '{name}' is already registered. Tool names must be unique; " +
+                "remove or rename the existing tool before registering another one with the same name.",
+                nameof(function));
+        }
+
         var definition = function.AsFunctionCall();
 
-        _tools[function.Name] = new RegisteredTool(
+        _tools[name] = new RegisteredTool(
             definition,
             handler
         );
     }
 
     /// <summary>
-    /// Registers a tool with the specified function definition and a strongly-typed handler. The handler is a function that takes an argument of type TArgs and returns a Task that resolves to a string result. The arguments are deserialized from JSON before being passed to the handler. If deserialization fails, a JsonException is thrown.
+    /// Registers a tool with the specified function definition and a strongly-typed handler. The handler is a function that takes an argument of type TArgs and returns a Task that resolves to a string result. The arguments are deserialized from JSON before being passed to the handler. A missing, empty or whitespace argument string is treated as an empty object, because providers commonly report tools without parameters that way.
     /// </summary>
     /// <typeparam name="TArgs">The type of the arguments for the tool.</typeparam>
     /// <param name="function">The API function to register.</param>
     /// <param name="handler">The strongly-typed handler for the tool.</param>
-    /// <exception cref="JsonException"></exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="function"/> or <paramref name="handler"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the function has no name, or when a tool with the same name is already
+    /// registered.
+    /// </exception>
+    /// <exception cref="CrideApiException">
+    /// Thrown at execution time when the arguments produced by the model cannot be deserialized
+    /// into <typeparamref name="TArgs"/>, with the offending JSON payload attached.
+    /// </exception>
     public void Register<TArgs>(ApiFunction function, Func<TArgs, Task<string>> handler)
     {
         ArgumentNullException.ThrowIfNull(function);
         ArgumentNullException.ThrowIfNull(handler);
 
+        var name = function.Name;
+
         ToolExecutor executor = async argumentsJson =>
         {
-            var args = JsonSerializer.Deserialize<TArgs>(argumentsJson, ToolJsonOptions)
-                ?? throw new JsonException(
-                    $"Failed to deserialize arguments for tool '{function.Name}'.");
+            // Providers frequently report a tool without parameters with an empty argument
+            // string, which is not valid JSON. Normalizing it keeps the call working instead of
+            // failing with a schema error the model cannot act on.
+            var json = string.IsNullOrWhiteSpace(argumentsJson)
+                ? "{}"
+                : argumentsJson;
+
+            TArgs? args;
+
+            try
+            {
+                args = JsonSerializer.Deserialize<TArgs>(
+                    json,
+                    ToolJsonOptions);
+            }
+            catch (JsonException exception)
+            {
+                throw new CrideApiException(
+                    message:
+                        $"The arguments produced by the model for tool '{name}' could not be deserialized into {typeof(TArgs).Name}.",
+                    component: ComponentName,
+                    operation: $"Execute tool '{name}'",
+                    innerException: exception,
+                    responseBody: json,
+                    hint:
+                        $"Check that the parameter schema declared in ApiFunction.Properties matches {typeof(TArgs).Name}.");
+            }
+
+            if (args is null)
+            {
+                throw new CrideApiException(
+                    message:
+                        $"The arguments produced by the model for tool '{name}' deserialized to null.",
+                    component: ComponentName,
+                    operation: $"Execute tool '{name}'",
+                    responseBody: json,
+                    hint:
+                        $"Check the parameters the model sent above against {typeof(TArgs).Name}.");
+            }
 
             return await handler(args);
         };
@@ -77,7 +156,7 @@ public sealed class ToolRegistry
     /// <returns>true if the tool is registered; otherwise, false.</returns>
     public bool Contains(string name)
     {
-        return _tools.ContainsKey(name);
+        return name is not null && _tools.ContainsKey(name);
     }
     
     /// <summary>
@@ -88,6 +167,12 @@ public sealed class ToolRegistry
     /// <returns>true if the tool is found; otherwise, false.</returns>
     public bool TryGet(string name, out RegisteredTool? tool)
     {
+        if (name is null)
+        {
+            tool = null;
+            return false;
+        }
+
         return _tools.TryGetValue(name, out tool);
     }
 
@@ -98,7 +183,7 @@ public sealed class ToolRegistry
     /// <returns>true if the tool is removed; otherwise, false.</returns>
     public bool Remove(string name)
     {
-        return _tools.Remove(name);
+        return name is not null && _tools.Remove(name);
     }
 
     /// <summary>

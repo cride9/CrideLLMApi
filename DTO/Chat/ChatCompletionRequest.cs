@@ -11,6 +11,10 @@ public sealed record ChatCompletionRequest
     public IEnumerable<ChatMessage> Messages { get; init; }
         = [];
 
+    /// <summary>
+    /// Gets the tool definitions exposed to the model. Omitted from the request when no tool is
+    /// registered, because providers reject an empty tool array.
+    /// </summary>
     [JsonPropertyName("tools")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IEnumerable<FunctionCallObject>? Tools { get; init; }
@@ -18,10 +22,17 @@ public sealed record ChatCompletionRequest
     [JsonPropertyName("stream")]
     public bool Stream { get; init; } = true;
 
+    /// <summary>
+    /// Gets the requested reasoning effort. Omitted from the request when no effort was requested.
+    /// </summary>
     [JsonPropertyName("reasoning_effort")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReasoningEffort { get; init; }
 
+    /// <summary>
+    /// Gets the tool choice sent to the provider. Omitted from the request when no tool is
+    /// registered, because providers validate the tool choice together with the tool definitions.
+    /// </summary>
     [JsonPropertyName("tool_choice")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ToolChoice { get; init; }

@@ -44,8 +44,13 @@ public sealed class ToolScheduler
 
         if (!_executions.TryAdd(key, execution))
         {
-            throw new InvalidOperationException(
-                $"Tool call '{key}' has already been scheduled.");
+            throw new CrideApiException(
+                message:
+                    $"Tool call '{key}' has already been scheduled, so it cannot be scheduled again.",
+                component: "ToolScheduler",
+                operation: "Schedule a tool call for execution",
+                hint:
+                    "Use a distinct tool call id for every call, and clear the completed executions with ClearCompleted before scheduling the same call again.");
         }
 
         ToolScheduled?.Invoke(execution);
@@ -72,7 +77,8 @@ public sealed class ToolScheduler
     /// </returns>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the tool call does not contain a valid function name, or when no executable
-    /// handler is registered for the requested tool.
+    /// handler is registered for the requested tool. Both failures are stored on the returned
+    /// <see cref="ToolExecution"/> as well, so a failing tool never aborts the whole batch.
     /// </exception>
     /// <exception cref="OperationCanceledException">
     /// Thrown when the operation is cancelled through <paramref name="cancellationToken"/>.
@@ -161,17 +167,22 @@ public sealed class ToolScheduler
     }
 
     /// <summary>
-    /// Retrieves all tool executions that have completed, which includes those that are completed, failed, or cancelled.
+    /// Retrieves all tool executions that reached a terminal status, which includes those that
+    /// completed, failed, or were cancelled.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>The tool executions that are no longer running.</returns>
     public IEnumerable<ToolExecution> GetCompleted()
     {
         return _executions.Values.Where(x =>
-            x.Status == ToolExecutionStatus.COMPLETED);
+            x.Status is ToolExecutionStatus.COMPLETED
+            or ToolExecutionStatus.FAILED
+            or ToolExecutionStatus.CANCELLED);
     }
 
     /// <summary>
-    /// Flushes all pending tool executions by awaiting their completion. This method will wait for all queued and running
+    /// Flushes all pending tool executions by awaiting their completion. Individual failures are
+    /// not thrown: inspect <see cref="ToolExecution.Status"/> and
+    /// <see cref="ToolExecution.Exception"/> on the returned executions.
     /// </summary>
     /// <returns>An array of the flushed tool executions.</returns>
     public async Task<ToolExecution[]> FlushAsync()
@@ -215,7 +226,7 @@ public sealed class ToolScheduler
     }
 
     /// <summary>
-    /// Generates a unique execution key for the given <see cref="ToolCall"/>. If the call has an explicit ID, that ID is used; otherwise, a new GUID-based key is generated.
+    /// Generates a unique execution key for the given <see cref="ToolCall"/>. If the call has an explicit ID, that ID is used; otherwise, a new GUID-based key is generated, so calls without an ID can never collide with each other.
     /// </summary>
     /// <param name="call">The tool call for which to generate an execution key.</param>
     /// <returns>The unique execution key.</returns>

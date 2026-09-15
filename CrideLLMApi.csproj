@@ -4,11 +4,30 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+
+		<PackageId>CrideLLMApi</PackageId>
+		<Version>0.1.0</Version>
+		<Description>Lightweight, streaming-first .NET client for OpenAI-compatible LLM APIs: chat completions, raw SSE access, tool calling and embeddings, with an extensible vector database layer.</Description>
+		<Authors>Cride</Authors>
+		<PackageTags>llm;openai;chat-completion;tool-calling;embeddings;streaming;llamacpp</PackageTags>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/cride9/CrideLLMApi.git</RepositoryUrl>
+
+		<!-- Ship the XML documentation generated from the source so consumers get IntelliSense guidance. -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-		<NoWarn>1701;1702;8618</NoWarn>
+		<!-- 1591: the public surface is not fully documented yet; the documented members still ship in the XML file. -->
+		<NoWarn>1701;1702;1591</NoWarn>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<NoWarn>1701;1702;8618</NoWarn>
+		<NoWarn>1701;1702;1591</NoWarn>
 	</PropertyGroup>
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="/" />
+	</ItemGroup>
 </Project>

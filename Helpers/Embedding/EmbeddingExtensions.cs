@@ -1,5 +1,9 @@
 ﻿namespace CrideLLMApi.Helpers;
 
+/// <summary>
+/// Vector helpers for <see cref="EmbeddingVector"/>: normalization, truncation, magnitude,
+/// similarity and distance.
+/// </summary>
 public static class EmbeddingExtensions
 {
     /// <summary>
@@ -7,11 +11,12 @@ public static class EmbeddingExtensions
     /// </summary>
     /// <param name="embedding">The embedding vector.</param>
     /// <returns>The normalized embedding vector.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="embedding"/> is null.</exception>
     public static EmbeddingVector Normalize(this EmbeddingVector embedding)
     {
         ArgumentNullException.ThrowIfNull(embedding);
 
-        if (embedding.Values.Length == 0)
+        if (embedding.Dimensions == 0)
             return embedding;
 
         double sum = 0;
@@ -24,9 +29,9 @@ public static class EmbeddingExtensions
         if (magnitude == 0)
             return embedding;
 
-        var values = new float[embedding.Values.Length];
+        var values = new float[embedding.Dimensions];
 
-        for (var i = 0; i < embedding.Values.Length; i++)
+        for (var i = 0; i < embedding.Dimensions; i++)
         {
             values[i] = (float)(embedding.Values[i] / magnitude);
         }
@@ -44,6 +49,7 @@ public static class EmbeddingExtensions
     /// <param name="embedding">The embedding vector.</param>
     /// <param name="dimensions">The number of dimensions to truncate to.</param>
     /// <returns>The truncated embedding vector.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="embedding"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the specified number of dimensions is invalid.</exception>
     public static EmbeddingVector Truncate(this EmbeddingVector embedding, int dimensions)
     {
@@ -76,8 +82,11 @@ public static class EmbeddingExtensions
     /// </summary>
     /// <param name="embedding">The embedding vector.</param>
     /// <returns>The magnitude of the embedding vector.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="embedding"/> is null.</exception>
     public static double Magnitude(this EmbeddingVector embedding)
     {
+        ArgumentNullException.ThrowIfNull(embedding);
+
         double sum = 0;
 
         foreach (var value in embedding.Values)
@@ -92,12 +101,14 @@ public static class EmbeddingExtensions
     /// <param name="left">The first embedding vector.</param>
     /// <param name="right">The second embedding vector.</param>
     /// <returns>The cosine similarity between the two vectors.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when either vector is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the vectors have different dimensions.</exception>
     public static double CosineSimilarity(this EmbeddingVector left, EmbeddingVector right)
     {
         ValidateSameDimensions(left, right);
 
-        if (left.IsNormalized == true &&
-            right.IsNormalized == true)
+        if (left.IsNormalized &&
+            right.IsNormalized)
         {
             return left.DotProduct(right);
         }
@@ -119,8 +130,11 @@ public static class EmbeddingExtensions
     /// <param name="embedding">The original embedding vector.</param>
     /// <param name="targetDimensions">The desired number of dimensions.</param>
     /// <returns>A new embedding vector with the specified number of dimensions.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when the target dimensions are invalid.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the target dimensions exceed the original dimensions.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="embedding"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the target dimensions are not positive, or when they exceed the current
+    /// dimensions. Dimensions can only be truncated, never increased.
+    /// </exception>
     public static EmbeddingVector WithDimensions(this EmbeddingVector embedding, int targetDimensions)
     {
         ArgumentNullException.ThrowIfNull(embedding);
@@ -130,9 +144,11 @@ public static class EmbeddingExtensions
 
         if (targetDimensions > embedding.Dimensions)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(targetDimensions),
                 $"Cannot increase embedding dimensions from " +
-                $"{embedding.Dimensions} to {targetDimensions}.");
+                $"{embedding.Dimensions} to {targetDimensions}. " +
+                $"Only truncation is supported.");
         }
 
         if (targetDimensions == embedding.Dimensions)
@@ -142,11 +158,13 @@ public static class EmbeddingExtensions
     }
 
     /// <summary>
-    /// Validates that two embedding vectors have the same number of dimensions.
+    /// Calculates the dot product of two embedding vectors.
     /// </summary>
     /// <param name="left">The first embedding vector.</param>
     /// <param name="right">The second embedding vector.</param>
     /// <returns>The dot product of the two vectors.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when either vector is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the vectors have different dimensions.</exception>
     public static double DotProduct(this EmbeddingVector left, EmbeddingVector right)
     {
         ValidateSameDimensions(left, right);
@@ -165,6 +183,8 @@ public static class EmbeddingExtensions
     /// <param name="left">The first embedding vector.</param>
     /// <param name="right">The second embedding vector.</param>
     /// <returns>The Euclidean distance between the two vectors.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when either vector is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the vectors have different dimensions.</exception>
     public static double EuclideanDistance(this EmbeddingVector left, EmbeddingVector right)
     {
         ValidateSameDimensions(left, right);
@@ -185,7 +205,8 @@ public static class EmbeddingExtensions
     /// </summary>
     /// <param name="left">The first embedding vector.</param>
     /// <param name="right">The second embedding vector.</param>
-    /// <exception cref="ArgumentException">Throws if any EmbeddingVector is null</exception>
+    /// <exception cref="ArgumentNullException">Throws if any EmbeddingVector is null</exception>
+    /// <exception cref="ArgumentException">Thrown when the vectors have different dimensions.</exception>
     private static void ValidateSameDimensions(EmbeddingVector left, EmbeddingVector right)
     {
         ArgumentNullException.ThrowIfNull(left);
