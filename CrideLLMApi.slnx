@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="../CrideLLMApi.Example/CrideLLMApi.Example.csproj" Id="f82f743f-f3f6-4981-a7b1-0ba9e4a4f372" />
+  <Project Path="../CrideLLMApi.VectorDB.ChromaDB/CrideLLMApi.VectorDB.ChromaDB.csproj" Id="4fff930c-b6cc-4ce0-b4fa-e42b0cfd268a" />
   <Project Path="CrideLLMApi.csproj" />
 </Solution>

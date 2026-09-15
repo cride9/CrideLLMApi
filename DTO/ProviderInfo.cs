@@ -11,6 +11,7 @@ public sealed record ProviderInfo
     public string? ApiKey { get; init; }
     public ChatProviderOptions Chat { get; init; } = new();
     public EmbeddingProviderOptions Embeddings { get; init; } = new();
+    public ExtensionProviderOptions Extensions { get; init; } = new();
     public API_MODE ApiMode { get; set; } = API_MODE.LOCAL;
 }
 

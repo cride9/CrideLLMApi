@@ -31,6 +31,7 @@ public enum REASONING_EFFORT
 [Flags]
 public enum TOOL_CHOICE
 {
+    NONE,
     AUTO,
     REQUIRED,
     COUNT
