@@ -8,7 +8,8 @@ namespace CrideLLMApi.Api;
 
 /// <summary>
 /// Entry point of CrideLLMApi. Owns the configured endpoints and the optional vector database
-/// extension, and is the object the consumer keeps for the lifetime of the conversation.
+/// extension. One instance can serve multiple conversations through independent endpoints
+/// created with CreateEndpointMethods. Keep it alive until their streams have finished.
 /// </summary>
 public class CrideApi : IDisposable, IAsyncDisposable
 {
@@ -75,7 +76,9 @@ public class CrideApi : IDisposable, IAsyncDisposable
     /// <returns>
     /// The registered instance of <typeparamref name="T"/>, or <see langword="null"/> when no
     /// endpoint of that type is registered. Prefer checking for <see langword="null"/> before
-    /// using the result. The endpoint instances are created on the first call.
+    /// using the result. The endpoint instances are created on the first call and cached.
+    /// For separate conversations use <see cref="CreateEndpointMethods{T}"/> instead of
+    /// replacing the context on this shared chat endpoint.
     /// </returns>
     /// <example>
     /// <code>
@@ -87,9 +90,28 @@ public class CrideApi : IDisposable, IAsyncDisposable
     /// <seealso cref="Embeddings"/>
     public T? GetEndpointMethods<T>() where T : class
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return GetEndpoints()
             .OfType<T>()
             .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Creates an independent endpoint using this API's connection and configuration.
+    /// Unlike GetEndpointMethods, the instance is not cached: a chat endpoint starts with
+    /// no context, tools or event handlers. Keep one per conversation and attach its own
+    /// ContextManager. The owning CrideApi must outlive all endpoints and active streams.
+    /// </summary>
+    /// <typeparam name="T">ChatCompletion or Embeddings.</typeparam>
+    /// <returns>A fresh endpoint, or null for an unsupported type.</returns>
+    public T? CreateEndpointMethods<T>() where T : class
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (typeof(T) == typeof(ChatCompletion))
+            return new ChatCompletion(_httpClient, _providerInfo) as T;
+        if (typeof(T) == typeof(Embeddings))
+            return new Embeddings(_httpClient, _providerInfo) as T;
+        return null;
     }
 
     /// <summary>

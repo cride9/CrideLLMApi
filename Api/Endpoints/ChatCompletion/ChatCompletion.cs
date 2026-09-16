@@ -7,6 +7,12 @@ using System.Text.Json;
 
 namespace CrideLLMApi.Api.Endpoints;
 
+/// <summary>
+/// Stateful chat endpoint. Use a separate endpoint and context per conversation.
+/// GetResponseAsync/GetRawResponseAsync allow one active enumeration per endpoint and context;
+/// overlapping calls fail before changing history. StreamCompletionAsync accepts independent
+/// request bodies concurrently. Do not mutate request DTOs or tool definitions while in use.
+/// </summary>
 public class ChatCompletion
 {
     private const string ComponentName = "ChatCompletion";
@@ -53,6 +59,8 @@ public class ChatCompletion
     /// The ContextManager instance used to manage the conversation context. This is optional and can be set using the AddContextManager method.
     /// </summary>
     private ContextManager? _contextManager;
+    private readonly object _configurationLock = new();
+    private bool _generationActive;
 
     /// <summary>
     /// The state of a single streamed round. The tool call fragments are accumulated per
@@ -125,8 +133,11 @@ public class ChatCompletion
     /// Gets the list of function calls that have been added to the ChatCompletion instance. This allows external code to retrieve the available API functions that can be called during the conversation.
     /// </summary>
     /// <returns>List of the current functions for this instance</returns>
-    public IEnumerable<FunctionCallObject> GetFunctionCalls() =>
-        _tools.Definitions;
+    public IEnumerable<FunctionCallObject> GetFunctionCalls()
+    {
+        lock (_configurationLock)
+            return _tools.Definitions.ToArray();
+    }
 
     /// <summary>
     /// Asynchronously gets the response from the LLM provider for a given message. This method streams the response in chunks and yields each chunk as it is received. It also handles tool calls that may be triggered during the conversation, executing them as needed and updating the context accordingly.
@@ -158,6 +169,10 @@ public class ChatCompletion
     /// reported by the provider, because several OpenAI-compatible servers answer tool calls with
     /// "stop" or "function_call". Every call keeps its own stream state; the attached
     /// <see cref="ContextManager"/> is shared by the instance.
+    /// Only one conversation generation may be enumerated at a time. An overlapping generation
+    /// throws InvalidOperationException. The guard lasts through the entire tool loop and is
+    /// released on completion, failure, cancellation, or enumerator disposal. No history rollback
+    /// or automatic assistant-message storage is performed.
     /// </remarks>
     /// <param name="message">The message for which to get a raw response.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
@@ -196,7 +211,11 @@ public class ChatCompletion
     /// </exception>
     public void AddFunction(ApiFunction function, ToolExecutor? handler = null)
     {
-        _tools.Register(function, handler);
+        lock (_configurationLock)
+        {
+            ThrowIfGenerationActive();
+            _tools.Register(function, handler);
+        }
     }
 
     /// <summary>
@@ -217,7 +236,11 @@ public class ChatCompletion
         ApiFunction function,
         Func<TArgs, Task<string>> handler)
     {
-        _tools.Register(function, handler);
+        lock (_configurationLock)
+        {
+            ThrowIfGenerationActive();
+            _tools.Register(function, handler);
+        }
     }
 
     /// <summary>
@@ -225,11 +248,16 @@ public class ChatCompletion
     /// </summary>
     /// <param name="ctxManager">The ContextManager instance to add.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="ctxManager"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown while a conversation generation is active.</exception>
     public void AddContextManager(ContextManager ctxManager)
     {
         ArgumentNullException.ThrowIfNull(ctxManager);
 
-        _contextManager = ctxManager;
+        lock (_configurationLock)
+        {
+            ThrowIfGenerationActive();
+            _contextManager = ctxManager;
+        }
     }
 
     /// <summary>
@@ -275,7 +303,9 @@ public class ChatCompletion
     }
 
     /// <summary>
-    /// Creates a new ChatCompletionRequest using the provided messages. This method utilizes the internal ChatCompletionRequestBuilder to generate the request payload based on the current conversation context and available tools. If no messages are provided, it will create a request with an empty message list.
+    /// Creates a request using the provided messages, or the attached context when omitted.
+    /// Reading the implicit context through this method is rejected during an active conversation
+    /// generation. Explicit independent messages may be used to build concurrent raw requests.
     /// </summary>
     /// <param name="messages">The messages to include in the request.</param>
     /// <returns>The created ChatCompletionRequest.</returns>
@@ -286,7 +316,19 @@ public class ChatCompletion
     public ChatCompletionRequest CreateRequest(
         IEnumerable<ChatMessage>? messages = null)
     {
-        return _requestBuilder.Create(messages);
+        lock (_configurationLock)
+        {
+            // An implicit request reads the same mutable history being updated by the tool loop.
+            if (messages is null) ThrowIfGenerationActive();
+            return _requestBuilder.Create(messages);
+        }
+    }
+
+    private void ThrowIfGenerationActive()
+    {
+        if (_generationActive)
+            throw new InvalidOperationException(
+                "This chat endpoint already has an active conversation generation. Wait for it to finish or use CrideApi.CreateEndpointMethods<ChatCompletion>() with a separate context. Context and tool registration cannot change during generation.");
     }
 
     private async IAsyncEnumerable<Delta> GetResponseCoreAsync(string message, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -303,6 +345,34 @@ public class ChatCompletion
     }
 
     private async IAsyncEnumerable<ChatCompletionChunk> GetRawResponseCoreAsync(string message, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ContextManager? context;
+        lock (_configurationLock)
+        {
+            ThrowIfGenerationActive();
+            context = _contextManager;
+            context?.BeginGeneration();
+            _generationActive = true;
+        }
+
+        try
+        {
+            await foreach (var chunk in GetRawResponseUnprotectedAsync(message, cancellationToken)
+                .WithCancellation(cancellationToken))
+                yield return chunk;
+        }
+        finally
+        {
+            lock (_configurationLock)
+            {
+                context?.EndGeneration();
+                _generationActive = false;
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<ChatCompletionChunk> GetRawResponseUnprotectedAsync(string message, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var requestBody = _requestBuilder.CreateWithMessage(REQUEST_ROLE.USER, message);
 

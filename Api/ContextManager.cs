@@ -4,6 +4,9 @@ namespace CrideLLMApi.Api;
 
 /// <summary>
 /// Manages the conversation history that is sent to the provider with every request.
+/// Keep a separate instance per conversation. Concurrent conversation generations sharing
+/// one context are rejected; direct history edits remain caller-controlled and must not race
+/// with request construction or tool-result writes.
 /// <para>
 /// All methods that return the history return the live internal list, so the returned value must
 /// not be modified by the caller. Use <see cref="GetMemory"/> when a defensive copy is needed.
@@ -11,6 +14,17 @@ namespace CrideLLMApi.Api;
 /// </summary>
 public class ContextManager
 {
+    private int _generationActive;
+
+    internal void BeginGeneration()
+    {
+        if (Interlocked.CompareExchange(ref _generationActive, 1, 0) != 0)
+            throw new InvalidOperationException(
+                "This context is already used by an active conversation generation. Wait for it to finish or use a separate ContextManager.");
+    }
+
+    internal void EndGeneration() => Volatile.Write(ref _generationActive, 0);
+
     /// <summary>
     /// The chat history of the conversation.
     /// </summary>

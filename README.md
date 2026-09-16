@@ -6,6 +6,69 @@ CrideLLMApi is designed around **low-level access and explicit control**. It exp
 
 The library is primarily developed around local OpenAI-compatible servers such as **llama.cpp**, while remaining compatible with remote OpenAI-style APIs.
 
+## Multiple users with one API instance
+
+`GetEndpointMethods<ChatCompletion>()` returns the same cached chat endpoint each time.
+Its context, registered tools, scheduler and events belong to that endpoint. Do not share
+it between users by switching its context while a response is running.
+
+Use `CreateEndpointMethods<ChatCompletion>()` to create an independent endpoint for each
+conversation. These endpoints share the owning API's HTTP connection and provider settings,
+but start with separate tool registries, schedulers and events, and no attached context:
+
+```csharp
+using var api = new CrideApi(providerInfo);
+
+var aliceChat = api.CreateEndpointMethods<ChatCompletion>()!;
+var aliceContext = new ContextManager();
+aliceChat.AddContextManager(aliceContext);
+
+var bobChat = api.CreateEndpointMethods<ChatCompletion>()!;
+var bobContext = new ContextManager();
+bobChat.AddContextManager(bobContext);
+
+// Register each conversation's tools and events on its own endpoint.
+// Both responses can be consumed concurrently through the same CrideApi.
+await Task.WhenAll(
+    ReadAsync(aliceChat, "Hello from Alice"),
+    ReadAsync(bobChat, "Hello from Bob"));
+
+static async Task ReadAsync(ChatCompletion chat, string message)
+{
+    await foreach (var chunk in chat.GetRawResponseAsync(message))
+    {
+        // Forward the raw chunk to this conversation's consumer.
+    }
+}
+```
+
+Keep each endpoint/context for as long as the application needs that conversation. You still
+control system prompts, context edits, assistant-message storage, persistence and cleanup.
+The API does not maintain a user dictionary or copy tools from its cached endpoint into new
+ones. Application code decides which authenticated user owns each conversation. Keep the
+owning `CrideApi` alive until all endpoint operations have finished; disposing it closes their
+shared HTTP client.
+
+`GetResponseAsync` and `GetRawResponseAsync` now reject overlapping active enumerations on
+the same chat endpoint or the same attached context with `InvalidOperationException`, before
+the rejected call modifies history. Wait for the previous generation, cancel and await its
+completion, or use an independent endpoint/context. The guard covers the entire automatic
+tool loop and is released on completion, exception, cancellation or enumerator disposal.
+Stop streams with `await foreach`/`await using` so enumerators are disposed correctly.
+
+Context replacement and tool registration are rejected during an active conversation
+generation. Direct context editing remains explicit and mutable: synchronize edits yourself
+so they do not race with request construction or tool-result writes. Cancelling or failing a
+generation does not roll back messages already added. Tool handlers and any application
+services shared between conversations remain responsible for their own thread safety.
+
+For fully manual requests, `StreamCompletionAsync(request)` already supports concurrent
+streams on one endpoint. Give each call its own request data; this path does not read/write
+the attached context or execute tools. The model server may independently limit concurrency.
+Creating separate endpoints does not partition shared vector database collections.
+
+Concurrency regression checks: `dotnet run --project tests/Concurrency/Concurrency.csproj`.
+
 ## Why CrideLLMApi?
 
 Most high-level LLM libraries hide much of the underlying API behavior behind abstractions.
