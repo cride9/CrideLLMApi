@@ -42,4 +42,13 @@ public sealed record ExtensionProviderOptions
     /// Gets the directory where the vector database stores its data.
     /// </summary>
     public string? VectorDBDataPath { get; init; }
+
+    /// <summary>Preinstalled vector database CLI used by an offline runtime.</summary>
+    public string? VectorDBExecutablePath { get; init; }
+
+    /// <summary>Whether the extension may download packages during startup.</summary>
+    public bool InstallVectorDBOnStartup { get; init; } = true;
+
+    /// <summary>Whether vector database process output is forwarded to the console.</summary>
+    public bool ForwardVectorDBLogs { get; init; } = true;
 }

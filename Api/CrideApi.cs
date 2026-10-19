@@ -17,6 +17,7 @@ public class CrideApi : IDisposable, IAsyncDisposable
 
     private readonly ProviderInfo _providerInfo;
     private readonly HttpClient _httpClient;
+    private readonly bool _ownsHttpClient;
     private readonly List<object> _endpoints = new();
     private readonly object _endpointLock = new();
     private readonly IVectorDatabase? _vectorDatabase;
@@ -36,7 +37,12 @@ public class CrideApi : IDisposable, IAsyncDisposable
     /// unsupported chat configuration, a vector database provider that is not registered, or a
     /// vector database that fails to initialize.
     /// </exception>
-    public CrideApi(ProviderInfo info)
+    public CrideApi(ProviderInfo info) : this(info, null)
+    {
+    }
+
+    /// <summary>Use a caller-owned HTTP client, for example one that restricts requests to loopback.</summary>
+    public CrideApi(ProviderInfo info, HttpClient? httpClient)
     {
         ArgumentNullException.ThrowIfNull(info);
 
@@ -49,10 +55,16 @@ public class CrideApi : IDisposable, IAsyncDisposable
                 : API_MODE.OPENAI_COMPATIBLE
         };
 
-        _httpClient = new()
+        _ownsHttpClient = httpClient is null;
+        _httpClient = httpClient ?? new HttpClient(new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false });
+        if (_httpClient.BaseAddress is null)
         {
-            BaseAddress = info.EndPoint,
-        };
+            _httpClient.BaseAddress = info.EndPoint;
+        }
+        else if (_httpClient.BaseAddress != info.EndPoint)
+        {
+            throw new ArgumentException("The supplied HTTP client must use ProviderInfo.EndPoint as its base address.", nameof(httpClient));
+        }
 
         if (_providerInfo.ApiMode.HasFlag(API_MODE.OPENAI_COMPATIBLE))
         {
@@ -171,7 +183,7 @@ public class CrideApi : IDisposable, IAsyncDisposable
             asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
 
-        _httpClient.Dispose();
+        if (_ownsHttpClient) _httpClient.Dispose();
 
         GC.SuppressFinalize(this);
     }
@@ -193,7 +205,7 @@ public class CrideApi : IDisposable, IAsyncDisposable
         else if (_vectorDatabase is IDisposable disposable)
             disposable.Dispose();
 
-        _httpClient.Dispose();
+        if (_ownsHttpClient) _httpClient.Dispose();
 
         GC.SuppressFinalize(this);
     }
