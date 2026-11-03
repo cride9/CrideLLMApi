@@ -49,8 +49,8 @@ ones. Application code decides which authenticated user owns each conversation. 
 owning `CrideApi` alive until all endpoint operations have finished; disposing it closes their
 shared HTTP client.
 
-`GetResponseAsync` and `GetRawResponseAsync` now reject overlapping active enumerations on
-the same chat endpoint or the same attached context with `InvalidOperationException`, before
+With an attached context, `GetResponseAsync` and `GetRawResponseAsync` reject overlapping
+active enumerations on the same chat endpoint or context with `InvalidOperationException`, before
 the rejected call modifies history. Wait for the previous generation, cancel and await its
 completion, or use an independent endpoint/context. The guard covers the entire automatic
 tool loop and is released on completion, exception, cancellation or enumerator disposal.
@@ -68,6 +68,34 @@ the attached context or execute tools. The model server may independently limit 
 Creating separate endpoints does not partition shared vector database collections.
 
 Concurrency regression checks: `dotnet run --project tests/Concurrency/Concurrency.csproj`.
+
+## Ten concurrent requests
+
+Without an attached context, the same chat endpoint accepts independent concurrent calls
+through `GetResponseAsync` and `GetRawResponseAsync`. Embeddings also accept concurrent calls
+on one endpoint. There is no client-side limit of ten; the provider determines its capacity.
+Do not modify request data while it is in use. Automatic tool loops require a separate chat
+endpoint and context per conversation, as shown above.
+
+```csharp
+var chat = api.GetEndpointMethods<ChatCompletion>()!;
+var embeddings = api.GetEndpointMethods<Embeddings>()!;
+
+// This chat endpoint has no attached ContextManager.
+await Task.WhenAll(Enumerable.Range(0, 10).Select(async index =>
+{
+    await foreach (var delta in chat.GetResponseAsync($"Question {index}"))
+    {
+        // Route each delta to the consumer identified by index.
+    }
+}));
+
+var vectors = await Task.WhenAll(Enumerable.Range(0, 10)
+    .Select(index => embeddings.EmbedAsync($"Document {index}")));
+```
+
+These are ten separate HTTP requests. `EmbedAsync(IEnumerable<string>)` remains a single
+HTTP request containing multiple inputs. Consume streams concurrently to start their requests.
 
 ## Why CrideLLMApi?
 
@@ -815,6 +843,41 @@ For lower-level access, `CreateRequest`, `CreateAsync`, and `GetRawResponseAsync
 
 ---
 
+# Reranking
+
+The `Reranker` endpoint follows the same request builder, transport and DTO pattern as embeddings.
+It sends `POST /v1/rerank` using `query`, string `documents`, optional `model` and `top_n`, and
+reads `results` containing original document `index` and `relevance_score`. This is the
+[Jina-compatible format supported by llama.cpp](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
+The server must serve a reranking model.
+
+```csharp
+using var api = new CrideApi(new ProviderInfo
+{
+    EndPoint = new Uri("http://127.0.0.1:8080"),
+    Reranker = new()
+    {
+        ModelName = "reranking-model",
+        TopN = 2
+    }
+});
+
+var reranker = api.GetEndpointMethods<Reranker>()!;
+string[] documents = ["Budapest is Hungary's capital.", "Paris is France's capital."];
+var results = await reranker.RerankAsync("Hungary's capital", documents);
+
+foreach (var result in results)
+    Console.WriteLine($"{result.RelevanceScore}: {documents[result.Index]}");
+```
+
+`CreateRequest` exposes the typed `RerankRequest`; `CreateAsync` returns the full
+`RerankResponse` including usage metadata and provider ordering. `RerankAsync` sorts results
+by descending score. `GetRawResponseAsync` returns an HTTP response that the caller must
+dispose. All sending methods accept `CancellationToken`, report provider failures through
+`CrideApiException`, and support independent concurrent calls on the same endpoint.
+
+---
+
 # Provider Configuration
 
 `ProviderInfo` configures the underlying LLM endpoint.
@@ -872,6 +935,7 @@ and switches to OpenAI-compatible authenticated mode.
 | `ApiKey`     | `string?`                  | Optional bearer token                         |
 | `Chat`       | `ChatProviderOptions`      | Chat completion configuration                 |
 | `Embeddings` | `EmbeddingProviderOptions` | Embedding endpoint configuration              |
+| `Reranker` | `RerankerProviderOptions` | Reranking model and optional `TopN`              |
 | `ApiMode`    | `API_MODE`                 | Local or authenticated OpenAI-compatible mode |
 
 `ChatProviderOptions` contains `ModelName`, `Streaming`, `ReasoningEffort`, `ToolChoice`, and `ToolExecutionMode`.
@@ -917,6 +981,7 @@ The endpoints that can be retrieved are:
 | ----------------- | -------------------------------------------------------------- |
 | `ChatCompletion`  | Chat completions, streaming, tool calling and the automatic tool loop |
 | `Embeddings`      | OpenAI-compatible `POST /v1/embeddings`                        |
+| `Reranker`        | Jina-compatible `POST /v1/rerank`                              |
 
 ## Extension access
 

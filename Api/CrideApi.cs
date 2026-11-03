@@ -1,4 +1,4 @@
-﻿using CrideLLMApi.Api.Endpoints;
+using CrideLLMApi.Api.Endpoints;
 using CrideLLMApi.DTO;
 using CrideLLMApi.Helpers;
 using CrideLLMApi.VectorDB;
@@ -83,7 +83,7 @@ public class CrideApi : IDisposable, IAsyncDisposable
     /// <typeparam name="T">
     /// The endpoint type to retrieve. The library registers the following endpoints:
     /// <see cref="ChatCompletion"/> (chat completions with streaming, tool calling and the
-    /// automatic tool loop) and <see cref="Embeddings"/> (OpenAI-compatible embeddings).
+    /// automatic tool loop), <see cref="Embeddings"/> and <see cref="Reranker"/>.
     /// </typeparam>
     /// <returns>
     /// The registered instance of <typeparamref name="T"/>, or <see langword="null"/> when no
@@ -103,9 +103,18 @@ public class CrideApi : IDisposable, IAsyncDisposable
     public T? GetEndpointMethods<T>() where T : class
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return GetEndpoints()
-            .OfType<T>()
-            .FirstOrDefault();
+        lock (_endpointLock)
+        {
+            var endpoint = _endpoints.OfType<T>().FirstOrDefault();
+            if (endpoint is not null)
+                return endpoint;
+
+            endpoint = CreateEndpointMethods<T>();
+            if (endpoint is not null)
+                _endpoints.Add(endpoint);
+
+            return endpoint;
+        }
     }
 
     /// <summary>
@@ -114,7 +123,7 @@ public class CrideApi : IDisposable, IAsyncDisposable
     /// no context, tools or event handlers. Keep one per conversation and attach its own
     /// ContextManager. The owning CrideApi must outlive all endpoints and active streams.
     /// </summary>
-    /// <typeparam name="T">ChatCompletion or Embeddings.</typeparam>
+    /// <typeparam name="T">ChatCompletion, Embeddings or Reranker.</typeparam>
     /// <returns>A fresh endpoint, or null for an unsupported type.</returns>
     public T? CreateEndpointMethods<T>() where T : class
     {
@@ -123,6 +132,8 @@ public class CrideApi : IDisposable, IAsyncDisposable
             return new ChatCompletion(_httpClient, _providerInfo) as T;
         if (typeof(T) == typeof(Embeddings))
             return new Embeddings(_httpClient, _providerInfo) as T;
+        if (typeof(T) == typeof(Reranker))
+            return new Reranker(_httpClient, _providerInfo) as T;
         return null;
     }
 
@@ -208,23 +219,6 @@ public class CrideApi : IDisposable, IAsyncDisposable
         if (_ownsHttpClient) _httpClient.Dispose();
 
         GC.SuppressFinalize(this);
-    }
-
-    private List<object> GetEndpoints()
-    {
-        lock (_endpointLock)
-        {
-            if (_endpoints.Count == 0)
-            {
-                var chatCompletion = new ChatCompletion(_httpClient, _providerInfo);
-                var embeddings = new Embeddings(_httpClient, _providerInfo);
-
-                _endpoints.Add(chatCompletion);
-                _endpoints.Add(embeddings);
-            }
-
-            return _endpoints;
-        }
     }
 
     private static void ValidateEndPoint(Uri endPoint)

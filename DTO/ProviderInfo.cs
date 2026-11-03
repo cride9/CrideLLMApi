@@ -1,4 +1,4 @@
-﻿using CrideLLMApi.Helpers;
+using CrideLLMApi.Helpers;
 
 namespace CrideLLMApi.DTO;
 
@@ -32,6 +32,11 @@ public sealed record ProviderInfo
     /// Gets the embedding configuration.
     /// </summary>
     public EmbeddingProviderOptions Embeddings { get; init; } = new();
+
+    /// <summary>
+    /// Gets the reranking configuration.
+    /// </summary>
+    public RerankerProviderOptions Reranker { get; init; } = new();
 
     /// <summary>
     /// Gets the extension configuration, for example the vector database to use.
@@ -125,4 +130,16 @@ public sealed record EmbeddingProviderOptions
     /// Gets a value indicating whether the returned vectors are normalized to unit length.
     /// </summary>
     public bool Normalize { get; init; } = false;
+}
+
+/// <summary>
+/// Represents options for a reranking provider.
+/// </summary>
+public sealed record RerankerProviderOptions
+{
+    /// <summary>Gets the reranking model identifier.</summary>
+    public string? ModelName { get; init; }
+
+    /// <summary>Gets the maximum number of results. Null uses the provider default.</summary>
+    public int? TopN { get; init; }
 }

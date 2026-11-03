@@ -1,4 +1,4 @@
-﻿using CrideLLMApi.Api.Tools;
+using CrideLLMApi.Api.Tools;
 using CrideLLMApi.DTO;
 using CrideLLMApi.Helpers;
 using System.Runtime.CompilerServices;
@@ -9,7 +9,7 @@ namespace CrideLLMApi.Api.Endpoints;
 
 /// <summary>
 /// Stateful chat endpoint. Use a separate endpoint and context per conversation.
-/// GetResponseAsync/GetRawResponseAsync allow one active enumeration per endpoint and context;
+/// Context-free calls may run concurrently. With an attached context, allow one active enumeration;
 /// overlapping calls fail before changing history. StreamCompletionAsync accepts independent
 /// request bodies concurrently. Do not mutate request DTOs or tool definitions while in use.
 /// </summary>
@@ -60,7 +60,7 @@ public class ChatCompletion
     /// </summary>
     private ContextManager? _contextManager;
     private readonly object _configurationLock = new();
-    private bool _generationActive;
+    private int _activeGenerations;
 
     /// <summary>
     /// The state of a single streamed round. The tool call fragments are accumulated per
@@ -169,7 +169,7 @@ public class ChatCompletion
     /// reported by the provider, because several OpenAI-compatible servers answer tool calls with
     /// "stop" or "function_call". Every call keeps its own stream state; the attached
     /// <see cref="ContextManager"/> is shared by the instance.
-    /// Only one conversation generation may be enumerated at a time. An overlapping generation
+    /// With an attached context, only one generation may be enumerated at a time. An overlapping generation
     /// throws InvalidOperationException. The guard lasts through the entire tool loop and is
     /// released on completion, failure, cancellation, or enumerator disposal. No history rollback
     /// or automatic assistant-message storage is performed.
@@ -326,7 +326,7 @@ public class ChatCompletion
 
     private void ThrowIfGenerationActive()
     {
-        if (_generationActive)
+        if (_activeGenerations > 0)
             throw new InvalidOperationException(
                 "This chat endpoint already has an active conversation generation. Wait for it to finish or use CrideApi.CreateEndpointMethods<ChatCompletion>() with a separate context. Context and tool registration cannot change during generation.");
     }
@@ -350,10 +350,10 @@ public class ChatCompletion
         ContextManager? context;
         lock (_configurationLock)
         {
-            ThrowIfGenerationActive();
             context = _contextManager;
+            if (context is not null) ThrowIfGenerationActive();
             context?.BeginGeneration();
-            _generationActive = true;
+            _activeGenerations++;
         }
 
         try
@@ -367,7 +367,7 @@ public class ChatCompletion
             lock (_configurationLock)
             {
                 context?.EndGeneration();
-                _generationActive = false;
+                _activeGenerations--;
             }
         }
     }
