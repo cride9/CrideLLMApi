@@ -251,9 +251,9 @@ public class ContextManager
     /// Clears the chat history and returns the cleared list of chat messages.
     /// </summary>
     /// <returns>The live internal list, which is empty after the call.</returns>
-    public List<ChatMessage> NewMemory( )
+    public List<ChatMessage> NewMemory()
     {
-        _chatHistory.Clear( );
+        _chatHistory.Clear();
         return _chatHistory;
     }
 
@@ -275,9 +275,9 @@ public class ContextManager
         if (ReferenceEquals(memory, _chatHistory))
             return _chatHistory;
 
-        var replacement = memory.ToArray( );
+        var replacement = memory.ToArray();
 
-        _chatHistory.Clear( );
+        _chatHistory.Clear();
         _chatHistory.AddRange(replacement);
 
         return _chatHistory;
@@ -287,8 +287,8 @@ public class ContextManager
     /// Gets a copy of the current chat history as a list of chat messages.
     /// </summary>
     /// <returns>A copy of the chat messages.</returns>
-    public List<ChatMessage>? GetMemory( ) =>
-        _chatHistory.Select(x => x with { }).ToList( );
+    public List<ChatMessage>? GetMemory() =>
+        _chatHistory.Select(x => x with { }).ToList();
 
     /// <summary>
     /// Converts a role to the lowercase role name expected by the OpenAI-compatible API.
@@ -297,5 +297,5 @@ public class ContextManager
     /// <param name="role">The role to convert.</param>
     /// <returns>The role name.</returns>
     private static string ToRoleName(REQUEST_ROLE role) =>
-        role.ToString( ).ToLowerInvariant( );
+        role.ToString().ToLowerInvariant();
 }

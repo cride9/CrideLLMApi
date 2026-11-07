@@ -339,7 +339,9 @@ public class ChatCompletion
         {
             var delta = chunk.Choices?.FirstOrDefault()?.Delta;
 
-            if (!string.IsNullOrWhiteSpace(delta?.Content))
+            // Whitespace-only deltas are real content: llama.cpp often streams a space as its own
+            // token, and dropping it glues words together inside the generated text.
+            if (!string.IsNullOrEmpty(delta?.Content))
                 yield return delta!;
         }
     }

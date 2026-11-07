@@ -79,7 +79,7 @@ public sealed record FunctionProperties
     /// </summary>
     [JsonPropertyName("enum")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public object[ ]? Enum { get; init; }
+    public object[]? Enum { get; init; }
 }
 
 /// <summary>

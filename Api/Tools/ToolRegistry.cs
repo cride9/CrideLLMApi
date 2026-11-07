@@ -158,7 +158,7 @@ public sealed class ToolRegistry
     {
         return name is not null && _tools.ContainsKey(name);
     }
-    
+
     /// <summary>
     /// Attempts to get a tool with the specified name from the registry.
     /// </summary>

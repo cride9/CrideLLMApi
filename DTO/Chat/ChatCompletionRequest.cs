@@ -60,6 +60,13 @@ public sealed record ChatCompletionRequest
     [JsonPropertyName("chat_template_kwargs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatTemplateOptions? ChatTemplateKwargs { get; init; }
+
+    /// <summary>
+    /// Optional structured output constraint (e.g. a JSON schema). Omitted when null.
+    /// </summary>
+    [JsonPropertyName("response_format")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResponseFormat? ResponseFormat { get; init; }
 }
 
 /// <summary>

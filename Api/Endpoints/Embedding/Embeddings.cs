@@ -1,4 +1,4 @@
-﻿using CrideLLMApi.DTO;
+using CrideLLMApi.DTO;
 using CrideLLMApi.Helpers;
 using System.Text.Json;
 
@@ -43,7 +43,7 @@ public sealed class Embeddings
     /// <param name="model">The model to use.</param>
     /// <returns>The embedding request.</returns>
     /// <exception cref="ArgumentException">Thrown when the input is null, empty or whitespace.</exception>
-    public EmbeddingRequest CreateRequest(string input, string? model = null) => 
+    public EmbeddingRequest CreateRequest(string input, string? model = null) =>
         _requestBuilder.Create(input, model);
 
     /// <summary>
@@ -54,7 +54,7 @@ public sealed class Embeddings
     /// <returns>The embedding request.</returns>
     /// <exception cref="ArgumentNullException">Thrown when the input collection is null.</exception>
     /// <exception cref="ArgumentException">Thrown when the input collection is empty or contains null, empty or whitespace-only strings.</exception>
-    public EmbeddingRequest CreateRequest(IEnumerable<string> input, string? model = null) => 
+    public EmbeddingRequest CreateRequest(IEnumerable<string> input, string? model = null) =>
         _requestBuilder.Create(input, model);
 
     /// <summary>
@@ -111,7 +111,7 @@ public sealed class Embeddings
     /// <returns>The embedding response.</returns>
     /// <exception cref="ArgumentException">Thrown when the input is null, empty or whitespace.</exception>
     /// <exception cref="CrideApiException">Thrown when the provider fails or returns no usable vectors.</exception>
-    public Task<EmbeddingResponse> CreateAsync(string input, CancellationToken cancellationToken = default) => 
+    public Task<EmbeddingResponse> CreateAsync(string input, CancellationToken cancellationToken = default) =>
         CreateAsync(CreateRequest(input), cancellationToken);
 
     /// <summary>
@@ -123,7 +123,7 @@ public sealed class Embeddings
     /// <exception cref="ArgumentNullException">Thrown when the input collection is null.</exception>
     /// <exception cref="ArgumentException">Thrown when the input collection is empty or contains null, empty or whitespace-only strings.</exception>
     /// <exception cref="CrideApiException">Thrown when the provider fails or returns no usable vectors.</exception>
-    public Task<EmbeddingResponse> CreateAsync(IEnumerable<string> input, CancellationToken cancellationToken = default) => 
+    public Task<EmbeddingResponse> CreateAsync(IEnumerable<string> input, CancellationToken cancellationToken = default) =>
         CreateAsync(CreateRequest(input), cancellationToken);
 
     /// <summary>
@@ -156,7 +156,14 @@ public sealed class Embeddings
     /// <exception cref="CrideApiException">Thrown when the provider fails or returns no usable vectors.</exception>
     public async Task<IReadOnlyList<EmbeddingVector>> EmbedAsync(IEnumerable<string> input, CancellationToken cancellationToken = default)
     {
-        var response = await CreateAsync(input, cancellationToken);
+        ArgumentNullException.ThrowIfNull(input);
+        var items = input.ToArray();
+        var response = await CreateAsync(items, cancellationToken);
+        if (response.Data.Count != items.Length ||
+            !response.Data.Select(x => x.Index).Order().SequenceEqual(Enumerable.Range(0, items.Length)))
+        {
+            throw new CrideApiException("The embedding response indices do not match the input batch.");
+        }
 
         return response.Data
             .OrderBy(x => x.Index)
